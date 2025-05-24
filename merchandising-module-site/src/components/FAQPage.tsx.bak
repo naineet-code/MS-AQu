@@ -599,7 +599,7 @@ export default function FAQPage() {
                                   ) 
                                 }}
                               />
-                              {getFormattedMessage(msg).length > 100 && (
+                              {(msg.message || '').length > 100 && (
                                 <Button
                                   variant="ghost"
                                   size="sm"

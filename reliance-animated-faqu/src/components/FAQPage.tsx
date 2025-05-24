@@ -16,6 +16,7 @@ import { useTheme } from "@/hooks/useTheme";
 import QuestionResponseSection from "./QuestionResponseSection";
 import { formatDistanceToNow } from 'date-fns';
 import { marked } from 'marked';
+import { aiFormatter } from '@/utils/aiFormatter';
 import HelpScreen from "./HelpScreen";
 
 // Funny FAQ initialization steps - randomized for variety
@@ -550,7 +551,7 @@ export default function FAQPage() {
                           {msg.isUser ? (
                             // User messages: always show full text (questions are usually short)
                             <span
-                              dangerouslySetInnerHTML={{ __html: marked.parse(msg.message || '') }}
+                              dangerouslySetInnerHTML={{ __html: marked.parse(aiFormatter.formatAnswer(msg.message || '')) }}
                             />
                           ) : (
                             // Bot messages: truncate long answers
@@ -558,9 +559,11 @@ export default function FAQPage() {
                               <span
                                 dangerouslySetInnerHTML={{ 
                                   __html: marked.parse(
-                                    expandedMessages.has(msg.id) 
-                                      ? msg.message || ''
-                                      : truncateMessage(msg.message || '')
+                                    aiFormatter.formatAnswer(
+                                      expandedMessages.has(msg.id) 
+                                        ? msg.message || ''
+                                        : truncateMessage(msg.message || '')
+                                    )
                                   ) 
                                 }}
                               />

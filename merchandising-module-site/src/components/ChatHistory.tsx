@@ -13,9 +13,10 @@ import { formatDistanceToNow } from "date-fns";
 interface ChatHistoryProps {
   messages: ChatMessage[];
   onClear: () => void;
+  getFormattedMessage?: (message: ChatMessage) => string; // Add the getFormattedMessage function
 }
 
-export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
+export default function ChatHistory({ messages, onClear, getFormattedMessage }: ChatHistoryProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const { theme } = useTheme();
@@ -39,7 +40,6 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
     if (message.length <= limit) return message;
     return message.slice(0, limit) + '...';
   };
-
 
   return (
     <>
@@ -110,15 +110,15 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
                           // User messages: always show full text (questions are usually short)
                           <p>{msg.message}</p>
                         ) : (
-                          // Bot messages: truncate long answers
+                          // Bot messages: truncate long answers with pre-formatted content
                           <>
                             <p>
                               {expandedMessages.has(msg.id) 
-                                ? msg.message 
-                                : truncateMessage(msg.message)
+                                ? (getFormattedMessage ? getFormattedMessage(msg) : msg.message)
+                                : truncateMessage(getFormattedMessage ? getFormattedMessage(msg) : msg.message)
                               }
                             </p>
-                            {msg.message.length > 100 && (
+                            {(getFormattedMessage ? getFormattedMessage(msg) : msg.message).length > 100 && (
                               <Button
                                 variant="ghost"
                                 size="sm"
