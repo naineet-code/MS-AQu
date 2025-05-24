@@ -130,6 +130,41 @@ export default {
 					"0%": { backgroundPosition: "0% 50%" },
 					"50%": { backgroundPosition: "100% 50%" },
 					"100%": { backgroundPosition: "0% 50%" }
+				},
+				"hover-tada": {
+					"0%": {
+						"transform": "scale(1)"
+					},
+					"10%": {
+						"transform": "scale(0.9) rotate(-3deg)"
+					},
+					"20%": {
+						"transform": "scale(0.9) rotate(-3deg)"
+					},
+					"30%": {
+						"transform": "scale(1.1) rotate(3deg)"
+					},
+					"40%": {
+						"transform": "scale(1.1) rotate(-3deg)"
+					},
+					"50%": {
+						"transform": "scale(1.1) rotate(3deg)"
+					},
+					"60%": {
+						"transform": "scale(1.1) rotate(-3deg)"
+					},
+					"70%": {
+						"transform": "scale(1.1) rotate(3deg)"
+					},
+					"80%": {
+						"transform": "scale(1.1) rotate(-3deg)"
+					},
+					"90%": {
+						"transform": "scale(1.1) rotate(3deg)"
+					},
+					"100%": {
+						"transform": "scale(1) rotate(0)"
+					}
 				}
 			},
 			animation: {
@@ -140,7 +175,8 @@ export default {
 				third: "third 5s infinite",
 				fourth: "fourth 5s infinite",
 				fifth: "fifth 5s infinite",
-				gradient: "gradient 3s ease infinite"
+				gradient: "gradient 3s ease infinite",
+				"hover-tada": "hover-tada 1s ease-in-out"
 			}
 		}
 	},

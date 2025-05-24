@@ -169,6 +169,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
                   </CollapsibleSection>
                 )}
 
+
                 {/* Answer Section: show answer or N/A */}
                 <AnswerSection content={data.answer || "N/A"} />
           </div>

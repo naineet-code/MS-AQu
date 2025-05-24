@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
+import { ButtonState } from "@/components/ui/submit-button";
 import { MovingBorderCard } from "@/components/ui/moving-border-card";
 import { motion } from "motion/react";
 import { useTheme } from "@/hooks/useTheme";
@@ -63,6 +64,19 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
   
   // Use the static sample questions
   const chatPlaceholders = defaultPlaceholders;
+  
+  // Determine button state based on current interaction state
+  const getButtonState = (): ButtonState => {
+    if (isReturnedFromResponse) {
+      return 'new-question'; // User clicked "New Question" - button on right, input ready
+    } else if (isInputFocused) {
+      return 'active'; // User is typing/focused - button on right
+    } else {
+      return 'initial'; // Default state - button towards top center
+    }
+  };
+  
+  const buttonState = getButtonState();
 
   useEffect(() => {
     // Auto-focus the input when the component loads with autoFocus prop
@@ -155,6 +169,7 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
               inputRef={inputRef}
+              buttonState={buttonState}
             />
           </CardContent>
         </Card>

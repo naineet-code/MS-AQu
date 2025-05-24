@@ -307,11 +307,13 @@ export default function FAQPage() {
         <div className="flex items-center gap-2">
         <Dialog>
           <DialogTrigger asChild>
-            <Button
-              size="icon"
-              variant="secondary"
-              aria-label="View Merchandising Document"
-              className="transform transition-all duration-200 ease-in-out hover:scale-110 text-white border-0 backdrop-blur-md"
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  aria-label="View Merchandising Document"
+                  className="transform transition-all duration-200 ease-in-out hover:animate-hover-tada text-white border-0 backdrop-blur-md"
               style={{
                 background: 'linear-gradient(135deg, rgba(59,130,246,0.8) 0%, rgba(37,99,235,0.9) 100%)',
                 backdropFilter: 'blur(10px)',
@@ -320,8 +322,13 @@ export default function FAQPage() {
                 boxShadow: '0 8px 32px 0 rgba(59,130,246,0.3)'
               }}
             >
-              <FileBarChart className="h-5 w-5 hover:animate-pulse" />
-            </Button>
+                  <FileBarChart className="h-5 w-5 hover:animate-pulse" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View Merchandising Document</p>
+              </TooltipContent>
+            </Tooltip>
           </DialogTrigger>
           <DialogContent className="max-w-6xl w-[90vw] h-[90vh] p-0 gap-0">
             {/* Header with Title and Controls */}
@@ -340,7 +347,7 @@ export default function FAQPage() {
               </DialogTitle>
               
               {/* Controls Container - positioned to avoid close button */}
-              <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
+              <div className="absolute right-16 top-4">
                 <Button
                   size="icon"
                   variant="outline"
@@ -351,7 +358,7 @@ export default function FAQPage() {
                       iframe.requestFullscreen();
                     }
                   }}
-                  className="h-8 w-8"
+                  className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
                 >
                   <Maximize2 className="h-4 w-4" />
                 </Button>
@@ -378,7 +385,7 @@ export default function FAQPage() {
               variant="secondary"
               aria-label="Help & How to Use"
               onClick={() => setShowHelpScreen(true)}
-              className="transform transition-all duration-200 ease-in-out hover:scale-110 text-white border-0 backdrop-blur-md"
+              className="transform transition-all duration-200 ease-in-out hover:animate-hover-tada text-white border-0 backdrop-blur-md"
               style={{
                 background: 'linear-gradient(135deg, rgba(168,85,247,0.8) 0%, rgba(139,69,197,0.9) 100%)',
                 backdropFilter: 'blur(10px)',
@@ -454,22 +461,29 @@ export default function FAQPage() {
 
       {/* Chat History Button and Panel */}
       <div className="fixed bottom-16 right-4 z-20">
-        <Button
-          size="icon"
-          variant="secondary"
-          aria-label="Chat History"
-          onClick={() => setShowChatHistory(!showChatHistory)}
-          className="transform transition-all duration-200 ease-in-out hover:scale-110 rounded-full text-white border-0 backdrop-blur-md"
-          style={{
-            background: 'linear-gradient(135deg, rgba(34,197,94,0.8) 0%, rgba(21,128,61,0.9) 100%)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            boxShadow: '0 8px 32px 0 rgba(34,197,94,0.3)'
-          }}
-        >
-          <Clock className="h-5 w-5 hover:animate-pulse" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="secondary"
+              aria-label="Chat History"
+              onClick={() => setShowChatHistory(!showChatHistory)}
+              className="transform transition-all duration-200 ease-in-out hover:animate-hover-tada rounded-full text-white border-0 backdrop-blur-md"
+              style={{
+                background: 'linear-gradient(135deg, rgba(34,197,94,0.8) 0%, rgba(21,128,61,0.9) 100%)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                boxShadow: '0 8px 32px 0 rgba(34,197,94,0.3)'
+              }}
+            >
+              <Clock className="h-5 w-5 hover:animate-pulse" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Analytics History</p>
+          </TooltipContent>
+        </Tooltip>
 
         {/* Floating Chat History Panel */}
         <AnimatePresence>
@@ -514,7 +528,7 @@ export default function FAQPage() {
                             clearHistory();
                           }
                         }}
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
                         aria-label="Clear Chat History"
                         disabled={chatHistory.length === 0}
                       >
@@ -528,7 +542,7 @@ export default function FAQPage() {
                     size="icon"
                     variant="ghost"
                     onClick={() => setShowChatHistory(false)}
-                    className="h-8 w-8"
+                    className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
                     aria-label="Close Chat History"
                   >
                     <X className="h-4 w-4" />
@@ -589,7 +603,7 @@ export default function FAQPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => toggleMessageExpansion(msg.id)}
-                                  className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 ${
+                                  className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada ${
                                     isDark ? 'text-green-400 hover:text-green-300' : 'text-blue-600 hover:text-blue-700'
                                   }`}
                                 >

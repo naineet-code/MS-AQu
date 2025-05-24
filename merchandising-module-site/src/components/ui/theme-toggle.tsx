@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -36,21 +37,28 @@ export const ThemeToggle = React.forwardRef<
   };
 
   return (
-    <Button
-      ref={ref}
-      variant="ghost"
-      size="icon"
-      onClick={handleToggle}
-      className="rounded-full backdrop-blur-sm border transform transition-transform duration-300 ease-in-out hover:scale-110 hover:rotate-12"
-      aria-label="Toggle theme"
-      {...props}
-    >
-      {theme === 'light' ? (
-        <Moon className="h-5 w-5 hover:animate-spin" />
-      ) : (
-        <Sun className="h-5 w-5 hover:animate-spin" />
-      )}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          ref={ref}
+          variant="ghost"
+          size="icon"
+          onClick={handleToggle}
+          className="rounded-full backdrop-blur-sm border transform transition-transform duration-300 ease-in-out hover:animate-hover-tada"
+          aria-label="Toggle theme"
+          {...props}
+        >
+          {theme === 'light' ? (
+            <Moon className="h-5 w-5 hover:animate-spin" />
+          ) : (
+            <Sun className="h-5 w-5 hover:animate-spin" />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Toggle Theme</p>
+      </TooltipContent>
+    </Tooltip>
   );
 });
 
