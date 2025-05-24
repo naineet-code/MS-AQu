@@ -13,9 +13,10 @@ import { formatDistanceToNow } from "date-fns";
 interface ChatHistoryProps {
   messages: ChatMessage[];
   onClear: () => void;
+  getFormattedMessage?: (message: ChatMessage) => string; // Add the getFormattedMessage function
 }
 
-export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
+export default function ChatHistory({ messages, onClear, getFormattedMessage }: ChatHistoryProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const { theme } = useTheme();
@@ -40,7 +41,6 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
     return message.slice(0, limit) + '...';
   };
 
-
   return (
     <>
       {/* Chat History Toggle */}
@@ -50,7 +50,7 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
             onClick={toggleHistory}
             variant="ghost"
             size="icon"
-            className={`fixed bottom-4 right-4 z-30 rounded-full backdrop-blur-sm transform transition-transform duration-200 ease-in-out hover:scale-110 ${
+            className={`fixed bottom-4 right-4 z-30 rounded-full backdrop-blur-sm transform transition-transform duration-200 ease-in-out hover:animate-hover-tada ${
               isDark
                 ? 'bg-zinc-800/30 border-white/20'
                 : 'bg-black/10 border-black/20'
@@ -83,7 +83,7 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
                         variant="ghost" 
                         size="icon" 
                         onClick={toggleHistory}
-                        className="h-8 w-8"
+                        className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
                         aria-label="Close chat history"
                       >
                         <X className="h-4 w-4 hover:animate-pulse" />
@@ -110,20 +110,20 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
                           // User messages: always show full text (questions are usually short)
                           <p>{msg.message}</p>
                         ) : (
-                          // Bot messages: truncate long answers
+                          // Bot messages: truncate long answers with pre-formatted content
                           <>
                             <p>
                               {expandedMessages.has(msg.id) 
-                                ? msg.message 
-                                : truncateMessage(msg.message)
+                                ? (getFormattedMessage ? getFormattedMessage(msg) : msg.message)
+                                : truncateMessage(getFormattedMessage ? getFormattedMessage(msg) : msg.message)
                               }
                             </p>
-                            {msg.message.length > 100 && (
+                            {(getFormattedMessage ? getFormattedMessage(msg) : msg.message).length > 100 && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => toggleMessageExpansion(msg.id)}
-                                className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 ${
+                                className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada ${
                                   isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
                                 }`}
                               >

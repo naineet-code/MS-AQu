@@ -50,7 +50,7 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
             onClick={toggleHistory}
             variant="ghost"
             size="icon"
-            className={`fixed bottom-4 right-4 z-30 rounded-full backdrop-blur-sm transform transition-transform duration-200 ease-in-out hover:scale-110 ${
+            className={`fixed bottom-4 right-4 z-30 rounded-full backdrop-blur-sm transform transition-transform duration-200 ease-in-out hover:animate-hover-tada ${
               isDark
                 ? 'bg-zinc-800/30 border-white/20'
                 : 'bg-black/10 border-black/20'
@@ -83,7 +83,7 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
                         variant="ghost" 
                         size="icon" 
                         onClick={toggleHistory}
-                        className="h-8 w-8"
+                        className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
                         aria-label="Close chat history"
                       >
                         <X className="h-4 w-4 hover:animate-pulse" />
@@ -123,7 +123,7 @@ export default function ChatHistory({ messages, onClear }: ChatHistoryProps) {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => toggleMessageExpansion(msg.id)}
-                                className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 ${
+                                className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada ${
                                   isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
                                 }`}
                               >

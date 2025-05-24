@@ -5,6 +5,69 @@ import { ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
 import { useTheme } from "@/hooks/useTheme";
 import { marked } from 'marked';
+import { aiFormatter } from '@/utils/aiFormatter';
+
+// Configure marked for enhanced rendering
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+  headerIds: false,
+  mangle: false
+});
+
+// Enhanced rich text renderer component
+interface RichTextRendererProps {
+  content: string;
+  className?: string;
+  isPreFormatted?: boolean; // Added flag to indicate if content is already formatted
+}
+
+const RichTextRenderer: React.FC<RichTextRendererProps> = ({ content, className = "", isPreFormatted = false }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
+  // Process the content to handle various formatting
+  const processContent = (text: string) => {
+    // Use pre-formatted content or apply formatting if needed
+    const formattedText = isPreFormatted ? text : aiFormatter.formatAnswer(text);
+    
+    // Convert marked to HTML
+    let processed = marked.parse(formattedText);
+    
+    // Add custom styling classes to elements with merchandising theme colors
+    processed = processed
+      .replace(/<h1>/g, `<h1 class="text-3xl font-bold mb-4 ${isDark ? 'text-cyan-300' : 'text-cyan-700'}">`)
+      .replace(/<h2>/g, `<h2 class="text-2xl font-semibold mb-3 ${isDark ? 'text-cyan-300' : 'text-cyan-700'}">`)
+      .replace(/<h3>/g, `<h3 class="text-xl font-semibold mb-2 ${isDark ? 'text-cyan-300' : 'text-cyan-700'}">`)
+      .replace(/<h4>/g, `<h4 class="text-lg font-semibold mb-2 ${isDark ? 'text-cyan-300' : 'text-cyan-700'}">`)
+      .replace(/<h5>/g, `<h5 class="text-base font-semibold mb-2 ${isDark ? 'text-cyan-300' : 'text-cyan-700'}">`)
+      .replace(/<h6>/g, `<h6 class="text-sm font-semibold mb-2 ${isDark ? 'text-cyan-300' : 'text-cyan-700'}">`)
+      .replace(/<p>/g, `<p class="mb-3 leading-relaxed">`)
+      .replace(/<ul>/g, `<ul class="mb-3 pl-6 list-disc space-y-1">`)
+      .replace(/<ol>/g, `<ol class="mb-3 pl-6 list-decimal space-y-1">`)
+      .replace(/<li>/g, `<li class="leading-relaxed">`)
+      .replace(/<blockquote>/g, `<blockquote class="border-l-4 ${isDark ? 'border-emerald-400 bg-gray-800' : 'border-emerald-500 bg-emerald-50'} pl-4 py-2 my-3 italic">`)
+      .replace(/<code>/g, `<code class="px-2 py-1 rounded text-sm ${isDark ? 'bg-gray-800 text-emerald-400' : 'bg-gray-100 text-emerald-700'} font-mono">`)
+      .replace(/<pre>/g, `<pre class="mb-3 p-4 rounded-lg overflow-x-auto ${isDark ? 'bg-gray-900 text-emerald-400' : 'bg-gray-100 text-emerald-700'}">`)
+      .replace(/<table>/g, `<table class="mb-3 w-full border-collapse ${isDark ? 'border-gray-600' : 'border-gray-300'}">`)
+      .replace(/<th>/g, `<th class="border ${isDark ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100'} px-3 py-2 text-left font-semibold">`)
+      .replace(/<td>/g, `<td class="border ${isDark ? 'border-gray-600' : 'border-gray-300'} px-3 py-2">`)
+      .replace(/<strong>/g, `<strong class="font-bold ${isDark ? 'text-amber-300' : 'text-amber-600'}">`)
+      .replace(/<em>/g, `<em class="italic ${isDark ? 'text-purple-300' : 'text-purple-600'}">`)
+      .replace(/<a /g, `<a class="text-cyan-500 hover:text-cyan-600 underline transition-colors" `);
+    
+    return processed;
+  };
+
+  return (
+    <div 
+      className={`prose prose-lg max-w-none ${className} ${
+        isDark ? 'prose-invert' : ''
+      }`}
+      dangerouslySetInnerHTML={{ __html: processContent(content) }}
+    />
+  );
+};
 
 interface CollapsibleSectionProps {
   title: string;
@@ -50,9 +113,9 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           borderTop: 'none'
         }}
       >
-        {/* Render children as markdown if string, else as is */}
+        {/* Render children as rich text if string, else as is */}
         {typeof children === 'string' ? (
-          <span dangerouslySetInnerHTML={{ __html: marked.parse(children) }} />
+          <RichTextRenderer content={children} />
         ) : children}
       </CollapsibleContent>
     </Collapsible>
@@ -61,9 +124,10 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
 
 interface AnswerSectionProps {
   content: string;
+  isPreFormatted?: boolean;
 }
 
-export const AnswerSection: React.FC<AnswerSectionProps> = ({ content }) => {
+export const AnswerSection: React.FC<AnswerSectionProps> = ({ content, isPreFormatted = false }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   
@@ -82,9 +146,9 @@ export const AnswerSection: React.FC<AnswerSectionProps> = ({ content }) => {
       }}
     >
       <h3 className={`text-xl font-bold mb-3 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>Answer:</h3>
-      <div className={`${isDark ? "text-white" : "text-zinc-800"} prose prose-lg max-w-none`}
-        dangerouslySetInnerHTML={{ __html: marked.parse(content || '') }}
-      />
+      <div className={`${isDark ? "text-white" : "text-zinc-800"}`}>
+        <RichTextRenderer content={content || ''} isPreFormatted={isPreFormatted} />
+      </div>
     </div>
   );
 };
@@ -125,9 +189,9 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
         }}>
         <CardContent className="p-4">
           <div className="flex flex-col gap-6">
-	            {hasError && (
-	              <div className={`p-4 ${isDark ? 'text-red-400' : 'text-red-600'}`}>{data.error}</div>
-	            )}
+                {hasError && (
+                  <div className={`p-4 ${isDark ? 'text-red-400' : 'text-red-600'}`}>{data.error}</div>
+                )}
                 {data.reasoning && (
                   <CollapsibleSection title="Reasoning" bgColorClass="bg-purple-900/60">
                     {data.reasoning}
@@ -158,7 +222,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
                             <span className="font-semibold">{p.pages}</span>
                           )}
                           {': '}
-                          <span dangerouslySetInnerHTML={{ __html: marked.parse(p.text || '') }} />
+                          <RichTextRenderer content={p.text || ''} className="inline" />
                         </div>
                       );
                     })}
@@ -214,8 +278,12 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
                   </CollapsibleSection>
                 )}
 
+
                 {/* Answer Section: show answer or N/A */}
-                <AnswerSection content={data.answer || "N/A"} />
+                <AnswerSection 
+                  content={data.answer || "N/A"} 
+                  isPreFormatted={data.formattedAnswer ? true : false} 
+                />
           </div>
         </CardContent>
       </Card>

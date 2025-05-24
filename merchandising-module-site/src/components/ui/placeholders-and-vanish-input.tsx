@@ -5,7 +5,7 @@ import React, { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useTypingPlaceholder } from "@/hooks/useTypingPlaceholder";
 import { TextVanishCanvas } from "./text-vanish-canvas";
-import { SubmitButton } from "./submit-button";
+import { SubmitButton, ButtonState } from "./submit-button";
 import { PlaceholderDisplay } from "./placeholder-display";
 
 export function PlaceholdersAndVanishInput({
@@ -15,6 +15,7 @@ export function PlaceholdersAndVanishInput({
   onFocus,
   onBlur,
   inputRef: externalInputRef,
+  buttonState = 'initial',
 }: {
   placeholders: string[];
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -22,6 +23,7 @@ export function PlaceholdersAndVanishInput({
   onFocus?: () => void;
   onBlur?: () => void;
   inputRef?: React.RefObject<HTMLInputElement>;
+  buttonState?: ButtonState;
 }) {
   const { currentPlaceholder } = useTypingPlaceholder(placeholders);
   const internalInputRef = useRef<HTMLInputElement>(null);
@@ -96,9 +98,11 @@ export function PlaceholdersAndVanishInput({
           )}
         />
         
-        <div className="absolute right-2 flex items-center justify-center h-full pointer-events-none">
-          <SubmitButton isDisabled={!value} isPressed={isButtonPressed} />
-        </div>
+        <SubmitButton 
+          isDisabled={!value} 
+          isPressed={isButtonPressed} 
+          buttonState={buttonState}
+        />
       </div>
 
       <PlaceholderDisplay 
