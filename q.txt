@@ -1,0 +1,20 @@
+What are the primary goals of the WSSI module in retail planning?
+How does the WSSI module use past, present, and future data to guide decision-making?
+Why is it important to split the Annual Operating Plan (AOP) into weekly segments?
+What role does the Retail Week Calendar play in the WSSI module’s calculations?
+What are the two types of inputs required by the WSSI module and how do they differ?
+How is store-level inventory data allocated across different sales channels in WSSI?
+What does the GRN (Goods Received Note) date represent and why is it important for inventory planning?
+In what cases would a style be excluded from WSSI planning?
+How is the ‘Actual Selling Price’ (ASP) calculated for projected weeks in the WSSI module?
+What factors determine the ‘Cost of Goods Sold’ (COGS) in projected periods?
+Explain how ‘Discount %’ is calculated for both actual and projected sales data.
+Why is the ‘Last Year’ performance used, and how is it aligned to the current planning periods?
+Describe how WSSI determines which sales channel a style should be planned in.
+How does shelf life and lead time influence a style’s flow across sales channels in WSSI?
+What is the difference in warehouse inventory handling for new vs. aged styles?
+How does WSSI ensure that planned inwards are correctly aligned with expected sales performance?
+What metrics are typically displayed in the WSSI screen’s Sales Metrics panel?
+How is the aggregation of store-level data handled before it is displayed in WSSI dashboards?
+Why might Discount % in future weeks appear inconsistent or surprising to users?
+How does WSSI support proactive stock planning through its ‘Weeks of Cover’ metric?
