@@ -1,8 +1,5 @@
 # %pip install tiktoken pypdf nltk openai pydantic --quiet
 
-import requests
-from io import BytesIO
-from pypdf import PdfReader
 import re
 import tiktoken
 from nltk.tokenize import sent_tokenize
@@ -14,6 +11,9 @@ from dotenv import load_dotenv
 import time
 import concurrent.futures
 import json
+from openai import AzureOpenAI
+import requests
+from io import BytesIO
 
 # Load environment variables
 load_dotenv()
@@ -114,10 +114,25 @@ def split_into_50_chunks(text: str, min_tokens: int = 500) -> List[Dict[str, Any
 
     return chunks
 
-from openai import OpenAI
+endpoint_mini = os.getenv("AZURE_OPENAI_ENDPOINT_MINI")
+key_mini = os.getenv("AZURE_OPENAI_API_KEY_MINI")
 
-# Initialize OpenAI client
-client = OpenAI()  # Will use OPENAI_API_KEY from environment variables
+client_mini = AzureOpenAI(
+    api_key=key_mini,
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION_MINI"),
+    azure_endpoint=endpoint_mini
+)
+deployment_mini = os.getenv("AZURE_OPENAI_DEPLOYMENT_MINI")
+
+endpoint_nano = os.getenv("AZURE_OPENAI_ENDPOINT_NANO")
+key_nano = os.getenv("AZURE_OPENAI_API_KEY_NANO")
+
+client_nano = AzureOpenAI(
+    api_key=key_nano,
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION_NANO"),
+    azure_endpoint=endpoint_nano
+)
+deployment_nano = os.getenv("AZURE_OPENAI_DEPLOYMENT_NANO")
 
 def create_routing_prompt(question: str, chunks: List[Dict], depth: int, scratchpad: str) -> str:
     """Create a prompt for routing chunks based on the question."""
@@ -146,8 +161,8 @@ def get_routing_decision(prompt: str) -> Dict:
     try:
         start_time = time.time()
         
-        response = client.chat.completions.create(
-            model="gpt-4.1",
+        response = client_mini.chat.completions.create(
+            model=deployment_mini,
             messages=[
                 {"role": "system", "content": "Select relevant chunks. Return JSON with 'selected_ids' and brief 'scratchpad'."},
                 {"role": "user", "content": prompt}
@@ -230,11 +245,36 @@ def process_batch(args: Tuple[str, List[Dict], int, int]) -> Dict:
     print(f"\nProcessing batch {batch_num} of {total_batches}")
     print(f"Chunks {batch_chunks[0]['id']} to {batch_chunks[-1]['id']}")
     
-    # Create a prompt for the batch
-    batch_prompt = create_routing_prompt(question, batch_chunks, 0, "")
+    # Create a prompt for the batch with more explicit reasoning requirements
+    batch_prompt = f"""You are a routing system that helps find relevant information in a document.
+Your task is to identify which chunks of text are most relevant to answering the following question:
+
+QUESTION: {question}
+
+For each chunk, you MUST:
+1. Evaluate if it contains information relevant to the question
+2. Explain WHY you selected or rejected each chunk
+3. Provide detailed reasoning about the relevance of selected chunks
+
+Respond with a JSON object containing:
+1. "selected_ids": List of chunk IDs that contain relevant information
+2. "scratchpad": Your detailed reasoning about why these chunks are relevant, including:
+   - Why each selected chunk is relevant to the question
+   - How the information in each chunk helps answer the question
+   - Any connections between different chunks
+
+CHUNKS:
+"""
+    
+    for chunk in batch_chunks:
+        batch_prompt += f"\nChunk {chunk['id']}:\n{chunk['text']}\n"
     
     # Get routing decision
     routing_decision = get_routing_decision(batch_prompt)
+    
+    # Ensure scratchpad is not empty
+    if not routing_decision.get("scratchpad"):
+        routing_decision["scratchpad"] = f"Selected chunks {routing_decision['selected_ids']} based on relevance to the question: {question}"
     
     batch_time = time.time() - batch_start_time
     print(f"Batch {batch_num} completed in {batch_time:.2f} seconds")
@@ -246,9 +286,9 @@ def route_chunks(question: str, chunks: List[Dict], depth: int = 0, scratchpad: 
     print(f"\n==== ROUTING AT DEPTH {depth} ====")
     
     start_time = time.time()
-    timeout = 15  # Reduced from 20 to 15 seconds
-    max_chunks_per_batch = 20  # Reduced from 30 to 20 chunks per batch
-    min_chunks_to_find = 3  # Stop if we find this many relevant chunks
+    timeout = 20  # Increased from 15 to 20 seconds
+    max_chunks_per_batch = 15  # Reduced from 20 to 15 chunks per batch for better reasoning
+    min_chunks_to_find = 3
     total_chunks = len(chunks)
     
     print(f"Total chunks to evaluate: {total_chunks}")
@@ -280,22 +320,28 @@ def route_chunks(question: str, chunks: List[Dict], depth: int = 0, scratchpad: 
                 if routing_decision["selected_ids"]:
                     all_selected_ids.update(routing_decision["selected_ids"])
                     print(f"Selected {len(routing_decision['selected_ids'])} chunks in this batch")
-                    if len(all_selected_ids) >= min_chunks_to_find:
-                        print(f"Found sufficient chunks ({len(all_selected_ids)}), stopping early")
-                        break
+                
+                # Always append reasoning, even if no chunks were selected
                 if routing_decision["scratchpad"]:
                     all_scratchpad.append(routing_decision["scratchpad"])
+                
+                # Only stop early if we have both enough chunks AND reasoning
+                if len(all_selected_ids) >= min_chunks_to_find and all_scratchpad:
+                    print(f"Found sufficient chunks ({len(all_selected_ids)}) and reasoning, stopping early")
+                    break
             except Exception as e:
                 print(f"Error processing batch: {e}")
+                all_scratchpad.append(f"Error in batch processing: {str(e)}")
     
     # Combine results
     result = {
         "selected_ids": list(all_selected_ids),
-        "scratchpad": "\n".join(all_scratchpad) if all_scratchpad else ""
+        "scratchpad": "\n\n".join(all_scratchpad) if all_scratchpad else "No reasoning generated due to processing issues."
     }
     
     print(f"\nRouting completed in {time.time() - start_time:.2f} seconds")
     print(f"Total chunks selected: {len(result['selected_ids'])}")
+    print(f"Reasoning length: {len(result['scratchpad'])} characters")
     
     return result
 
@@ -344,11 +390,19 @@ def navigate_to_paragraphs(document_text: str, question: str, max_depth: int = 1
         if current_depth == max_depth:
             print(f"\nReturning {len(selected_chunks)} relevant chunks at depth {current_depth}")
 
-            # Update display IDs to show hierarchy
+            # Update display IDs and format paragraphs
+            formatted_chunks = []
             for chunk in selected_chunks:
-                chunk["display_id"] = chunk_paths[chunk["id"]]
+                display_id = chunk_paths[chunk["id"]]
+                formatted_chunk = {
+                    "id": chunk["id"],
+                    "display_id": display_id,
+                    "text": chunk["text"],
+                    "pages": chunk.get("pages", [])  # Preserve page numbers
+                }
+                formatted_chunks.append(formatted_chunk)
 
-            return {"paragraphs": selected_chunks, "scratchpad": scratchpad}
+            return {"paragraphs": formatted_chunks, "scratchpad": scratchpad}
 
         # Prepare next level by splitting selected chunks further
         next_level_chunks = []
@@ -362,6 +416,7 @@ def navigate_to_paragraphs(document_text: str, question: str, max_depth: int = 1
             for sub_chunk in sub_chunks:
                 path = f"{chunk_paths[chunk['id']]}.{sub_chunk['id']}"
                 sub_chunk["id"] = next_chunk_id
+                sub_chunk["pages"] = chunk.get("pages", [])  # Preserve page numbers
                 chunk_paths[next_chunk_id] = path
                 next_level_chunks.append(sub_chunk)
                 next_chunk_id += 1
@@ -374,10 +429,10 @@ def navigate_to_paragraphs(document_text: str, question: str, max_depth: int = 1
 
 from pydantic import BaseModel, field_validator
 
-class LegalAnswer(BaseModel):
-    """Structured response format for legal questions"""
+class Answer(BaseModel):
+    """Structured response format for questions"""
     answer: str
-    citations: List[str]
+    citations: List[Dict[str, str]]  # Changed from List[str] to List[Dict[str, str]]
 
     @field_validator('citations')
     def validate_citations(cls, citations, info):
@@ -385,111 +440,109 @@ class LegalAnswer(BaseModel):
         valid_citations = info.data.get('_valid_citations', [])
         if valid_citations:
             for citation in citations:
-                if citation not in valid_citations:
-                    raise ValueError(f"Invalid citation: {citation}. Must be one of: {valid_citations}")
+                if citation.get('id') not in valid_citations:
+                    raise ValueError(f"Invalid citation: {citation.get('id')}. Must be one of: {valid_citations}")
         return citations
 
 def generate_answer(question: str, paragraphs: List[Dict[str, Any]],
-                   scratchpad: str) -> LegalAnswer:
+                   scratchpad: str) -> Answer:
     """Generate an answer from the retrieved paragraphs."""
     print("\n==== GENERATING ANSWER ====")
 
-    # Extract valid citation IDs
     valid_citations = [str(p.get("display_id", str(p["id"]))) for p in paragraphs]
 
     if not paragraphs:
-        return LegalAnswer(
+        print("No paragraphs found for answer generation.")
+        return Answer(
             answer="I couldn't find relevant information to answer this question in the document.",
             citations=[],
             _valid_citations=[]
         )
 
-    # Prepare context for the model
     context = ""
     for paragraph in paragraphs:
         display_id = paragraph.get("display_id", str(paragraph["id"]))
         context += f"PARAGRAPH {display_id}:\n{paragraph['text']}\n\n"
 
-    system_prompt = """You are a Harry Potter expert answering questions about the
-Harry Potter series.
-
-Answer questions based ONLY on the provided paragraphs. Do not rely on any foundation knowledge or external information or extrapolate from the paragraphs.
-Cite phrases of the paragraphs that are relevant to the answer. This will help you be more specific and accurate.
-Include citations to paragraph IDs for every statement in your answer. Valid citation IDs are: {valid_citations_str}
-Keep your answer clear, precise, and professional.
-
-Your response must be in JSON format with the following structure:
-{{
-    "answer": "your detailed answer here",
-    "citations": ["citation_id1", "citation_id2", ...]
-}}
-"""
     valid_citations_str = ", ".join(valid_citations)
+    system_prompt = f"""You are an AI assistant helping with document analysis.\n\nAnswer the question using ONLY the provided paragraphs. Do not use external knowledge.\n\nFormat your response in markdown with the following sections:\n## Answer\n(Your answer here, do NOT include citations or references in this section.)\n\n## Citations\n- For each citation, use a bullet point in this format:\n  - [Section Name] (ID: <id>): \"Relevant excerpt from the paragraph\"\n\nExample:\n## Answer\nAOP stands for Annual Operating Plan. It is used for...\n\n## Citations\n- [AOP Definition] (ID: 2): \"AOP Annual Operating Plan revenue is typically defined at a monthly or period level...\"\n- [COGS Calculation] (ID: 3): \"COGS values are stored in the i n t e r i m w s s i a o p d a t a table...\"\n"""
 
-    # Call the model using structured output
-    response = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[
-            {"role": "system", "content": system_prompt.format(valid_citations_str=valid_citations_str)},
-            {"role": "user", "content": f"QUESTION: {question}\n\nSCRATCHPAD (Navigation reasoning):\n{scratchpad}\n\nPARAGRAPHS:\n{context}"}
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.3
-    )
-
-    # Parse the response into LegalAnswer format
     try:
+        response = client_nano.chat.completions.create(
+            model=deployment_nano,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"QUESTION: {question}\n\nSCRATCHPAD (Navigation reasoning):\n{scratchpad}\n\nPARAGRAPHS:\n{context}"}
+            ],
+            temperature=0.3
+        )
+
         response_content = response.choices[0].message.content.strip()
-        response_data = json.loads(response_content)
-        answer = LegalAnswer(
-            answer=response_data.get("answer", ""),
-            citations=response_data.get("citations", []),
+        print("\n[LOG] Raw LLM response:\n", response_content)
+
+        answer_match = re.search(r"## Answer\n([\s\S]*?)(?=\n## Citations|\Z)", response_content)
+        citations_match = re.search(r"## Citations\n([\s\S]*)", response_content)
+        answer_text = answer_match.group(1).strip() if answer_match else ""
+        citations_text = citations_match.group(1).strip() if citations_match else ""
+
+        print("\n[LOG] Extracted ## Answer section:\n", answer_text)
+        print("\n[LOG] Extracted ## Citations section:\n", citations_text)
+
+        citations = []
+        for line in citations_text.splitlines():
+            line = line.strip()
+            if not line.startswith("-"):
+                continue
+            m = re.match(r"- \[(.*?)\] \(ID: (.*?)\): \"([\s\S]*?)\"", line)
+            if m:
+                section, cid, text = m.groups()
+                citations.append({
+                    "id": cid,
+                    "section": section,
+                    "text": text
+                })
+        
+        # If no citations were parsed from the LLM response, create them from paragraphs
+        if not citations:
+            for p in paragraphs:
+                display_id = p.get("display_id", str(p["id"]))
+                pages = p.get("pages", [])
+                if pages:
+                    citations.append({
+                        "id": display_id,
+                        "section": f"Section {display_id}",
+                        "text": f"Page {', '.join(map(str, pages))}"
+                    })
+
+        print("\n[LOG] Parsed citations array:")
+        for c in citations:
+            print(c)
+            
+        answer = Answer(
+            answer=answer_text,
+            citations=citations,
             _valid_citations=valid_citations
         )
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"Error parsing response: {e}")
-        print(f"Response content: {repr(response.choices[0].message.content)}")
-        
-        # Try to repair the JSON here too
-        response_content = response.choices[0].message.content.strip()
-        
-        try:
-            # Basic repair attempt for generate_answer response
-            fixed_content = response_content
-            
-            # Handle incomplete answer field
-            if '"answer": "' in fixed_content and fixed_content.count('"answer": "') == 1:
-                parts = fixed_content.split('"answer": "')
-                if len(parts) == 2:
-                    after_answer = parts[1]
-                    # Find where answer string should end
-                    if '", "citations"' not in after_answer and '",' not in after_answer:
-                        # Answer string is incomplete
-                        fixed_content = parts[0] + '"answer": "Response was truncated", "citations": []}'
-            
-            # Handle missing closing braces
-            open_braces = fixed_content.count('{')
-            close_braces = fixed_content.count('}')
-            if open_braces > close_braces:
-                fixed_content += '}' * (open_braces - close_braces)
-            
-            response_data = json.loads(fixed_content)
-            print(f"Successfully repaired answer JSON")
-            answer = LegalAnswer(
-                answer=response_data.get("answer", "Response was truncated"),
-                citations=response_data.get("citations", []),
-                _valid_citations=valid_citations
-            )
-        except json.JSONDecodeError:
-            print("Could not repair answer JSON, using fallback")
-            answer = LegalAnswer(
-                answer="Error generating answer due to JSON parsing issue. Please try again.",
-                citations=[],
-                _valid_citations=valid_citations
-            )
+    except Exception as e:
+        print(f"Error generating answer: {e}")
+        citations = []
+        for p in paragraphs:
+            display_id = p.get("display_id", str(p["id"]))
+            pages = p.get("pages", [])
+            if pages:
+                citations.append({
+                    "id": display_id,
+                    "section": f"Section {display_id}",
+                    "text": f"Page {', '.join(map(str, pages))}"
+                })
+        answer = Answer(
+            answer="Error generating answer. Please try again.",
+            citations=citations,
+            _valid_citations=valid_citations
+        )
 
-    print(f"\nAnswer: {answer.answer}")
-    print(f"Citations: {answer.citations}")
+    print(f"\n[LOG] Final answer to return: {answer.answer}")
+    print(f"[LOG] Final citations to return: {answer.citations}")
 
     return answer
 

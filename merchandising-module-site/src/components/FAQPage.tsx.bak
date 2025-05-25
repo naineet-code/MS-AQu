@@ -18,7 +18,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { marked } from 'marked';
 import { aiFormatter } from '@/utils/aiFormatter';
 import HelpScreen from "./HelpScreen";
-import { BACKEND_URL } from "@/config";
 
 // Expanded fashion merchandising initialization steps - 5 different sets
 const funnyMerchandiseSteps = [
@@ -232,7 +231,7 @@ export default function FAQPage() {
   useEffect(() => {
     const initializeSystem = async () => {
       try {
-        await fetch(`${BACKEND_URL}/change-pdf`, {
+        await fetch('http://57.154.209.147:6001/change-pdf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pdf_name: 'algo.pdf' }),
@@ -258,7 +257,7 @@ export default function FAQPage() {
   const handleSubmitQuestion = async (question: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/search`, {
+      const res = await fetch('http://57.154.209.147:6001/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question, pdf_name: 'algo.pdf' }),
@@ -371,7 +370,7 @@ export default function FAQPage() {
             {/* PDF Viewer */}
             <iframe
               id="faq-pdf-iframe"
-              src={`${BACKEND_URL}/pdf/algo.pdf`}
+              src="http://57.154.209.147:6001/pdf/algo.pdf"
               title="FAQ PDF"
               className="w-full flex-1 border-0"
               style={{ height: 'calc(90vh - 80px)' }}
@@ -600,7 +599,7 @@ export default function FAQPage() {
                                   ) 
                                 }}
                               />
-                              {getFormattedMessage(msg).length > 100 && (
+                              {(msg.message || '').length > 100 && (
                                 <Button
                                   variant="ghost"
                                   size="sm"

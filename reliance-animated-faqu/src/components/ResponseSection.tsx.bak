@@ -11,7 +11,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy as faCopyRegular } from '@fortawesome/free-regular-svg-icons';
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
-import { createRoot } from 'react-dom/client';
 
 // Configure marked for enhanced rendering
 marked.setOptions({
@@ -169,17 +168,18 @@ export const AnswerSection: React.FC<AnswerSectionProps> = ({ content }) => {
       transition={{ duration: 0.3 }}
       className="w-full"
     >
-      <Card className={`p-8 rounded-3xl backdrop-blur-xl border ${isDark ? 'border-white/20' : 'border-black/10'} shadow-2xl`}
+      <Card className={`p-8 rounded-3xl backdrop-blur-xl border ${
+        isDark 
+          ? 'bg-zinc-900/50 border-white/10' 
+          : 'bg-white/60 border-white/20'
+      } shadow-2xl`}
         style={{
-          background: isDark 
-            ? 'rgba(30, 41, 59, 0.3)'
-            : 'rgba(255, 255, 255, 0.3)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
           boxShadow: isDark
             ? '0 8px 32px 0 rgba(31, 38, 135, 0.25), 0 1.5px 8px 0 rgba(255,255,255,0.08) inset'
             : '0 8px 32px 0 rgba(31, 38, 135, 0.10), 0 1.5px 8px 0 rgba(0,0,0,0.04) inset',
           border: isDark ? '1.5px solid rgba(255,255,255,0.18)' : '1.5px solid rgba(0,0,0,0.08)',
+          backdropFilter: 'blur(18px)',
+          WebkitBackdropFilter: 'blur(18px)',
         }}
       >
         <div className="space-y-4">
@@ -240,19 +240,11 @@ interface ResponseCardProps {
   data: any;
 }
 
-// Helper to get unique page numbers from a string like "Page 1, 2, 3" or "Page 1-3"
-function getUniquePages(pageStr: string): number[] {
+// Helper to get unique page numbers from a string like "Page 1, 2, 3, 3"
+function getUniquePages(pageStr: string): string[] {
   if (!pageStr) return [];
-  // Remove 'Page' or 'Pages', then split on commas or dashes
-  pageStr = pageStr.replace(/Page(s)?/i, '').replace(/-/g, ',');
-  return Array.from(
-    new Set(
-      pageStr
-        .split(',')
-        .map(p => parseInt(p.trim(), 10))
-        .filter(n => !isNaN(n))
-    )
-  );
+  const pages = pageStr.replace(/Page(s)?/i, '').split(',').map(p => p.trim()).filter(Boolean);
+  return Array.from(new Set(pages));
 }
 
 // Helper to render unique page numbers as clickable links
@@ -272,103 +264,6 @@ function renderUniquePageLinks(pageStr: string) {
   ));
 }
 
-function renderPageLinksLine(pages: Set<string>) {
-  const sortedPages = Array.from(pages).sort((a, b) => Number(a) - Number(b));
-  return (
-    <span>
-      Page{' '}
-      {sortedPages.map((page, idx) => (
-        <span key={page}>
-          <a
-            href={`${BACKEND_URL}/pdf/source.pdf#page=${page}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:text-blue-700 underline"
-            aria-label={`Open PDF at page ${page}`}
-          >
-            {page}
-          </a>
-          {idx < sortedPages.length - 1 && ', '}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function isPageText(text: string) {
-  // Matches 'Page 1', 'Page 1, 2, 3', 'Page 13, 14, 15, 16', etc.
-  return /^Page(\s+\d+(,\s*\d+)*)$/.test(text.trim());
-}
-
-function truncateText(text: string, maxLength = 120) {
-  if (!text) return '';
-  return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
-}
-
-function groupCitationsByIndividualPage(citations: any[]) {
-  // Map: page number -> Set of unique paragraph texts
-  const grouped: Record<string, Set<string>> = {};
-  citations.forEach((citation) => {
-    // Skip if text is just 'Page ...'
-    if (citation.text && /^Page(\s+\d+(,\s*\d+)*)$/.test(citation.text.trim())) return;
-    const pages = getUniquePages(citation.page || citation.text || '');
-    pages.forEach((page) => {
-      if (!grouped[page]) grouped[page] = new Set();
-      if (citation.text) grouped[page].add(citation.text);
-    });
-  });
-  // Return sorted by page number
-  return Object.entries(grouped).sort((a, b) => Number(a[0]) - Number(b[0]));
-}
-
-function groupCitationsByPageRange(citations: any[]) {
-  // Group by unique set of page numbers
-  const grouped: Record<string, { pages: number[], texts: string[] }> = {};
-  citations.forEach((citation) => {
-    // Skip if text is just 'Page ...'
-    if (citation.text && /^Page(\s+\d+(,\s*\d+)*)$/.test(citation.text.trim())) return;
-    const pages = getUniquePages(citation.page || '');
-    if (pages.length === 0) return;
-    const sortedPages = pages.sort((a, b) => a - b);
-    const key = sortedPages.join(',');
-    if (!grouped[key]) {
-      grouped[key] = { pages: sortedPages, texts: [] };
-    }
-    // Avoid duplicate paragraphs
-    if (citation.text && !grouped[key].texts.includes(citation.text)) {
-      grouped[key].texts.push(citation.text);
-    }
-  });
-  // Return sorted by first page number
-  return Object.values(grouped).sort((a, b) => a.pages[0] - b.pages[0]);
-}
-
-function renderPageRangeHeading(pages: number[]) {
-  if (pages.length === 1) {
-    return `Page ${pages[0]}`;
-  } else if (pages.length > 1) {
-    return `Pages ${pages[0]}–${pages[pages.length - 1]}`;
-  }
-  return '';
-}
-
-const ShowMoreLess: React.FC<{ text: string; maxLength?: number }> = ({ text, maxLength = 120 }) => {
-  const [expanded, setExpanded] = useState(false);
-  if (!text) return null;
-  if (text.length <= maxLength) return <span>{text}</span>;
-  return (
-    <span>
-      {expanded ? text : text.slice(0, maxLength) + '...'}{' '}
-      <button
-        className="text-blue-500 hover:underline text-xs ml-1"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        {expanded ? 'Show less' : 'Show more'}
-      </button>
-    </span>
-  );
-};
-
 const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -376,46 +271,29 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
   if (!data) return null;
 
   const hasError = data.error;
-  const paragraphs = Array.isArray(data.relevant_paragraphs) ? data.relevant_paragraphs : [];
-  const citations = Array.isArray(data.citations) ? data.citations : [];
-  const hasAnswer = typeof data.answer === 'string' && data.answer !== "N/A";
-  const hasReasoning = typeof data.reasoning === 'string' && data.reasoning.trim() !== "";
-  const statusMessage = typeof data.status_message === 'string' ? data.status_message : null;
+  const paragraphs = data.relevant_paragraphs || [];
+  const citations = data.citations || [];
+  const hasAnswer = data.answer && data.answer !== "N/A";
+  const hasReasoning = data.reasoning && data.reasoning.trim() !== "";
+  const statusMessage = data.status_message;
 
-  // Common background styles for sections
-  const sectionBackgroundStyle = {
-    background: isDark 
-      ? 'rgba(30, 41, 59, 0.3)'
-      : 'rgba(255, 255, 255, 0.3)',
-    backdropFilter: 'blur(18px)',
-    WebkitBackdropFilter: 'blur(18px)',
-  };
-
-  // Process reasoning text to add line breaks before each section
-  const processReasoning = (text: string) => {
-    if (!text) return '';
-    
-    // First, replace all occurrences of chunk/chunks with section/sections
-    let processedText = text
-      .replace(/\bchunks\b/gi, 'sections')
-      .replace(/\bchunk\b/gi, 'section')
-      .replace(/\bChunks\b/g, 'Sections')
-      .replace(/\bChunk\b/g, 'Section');
-    
-    // Then handle the section headers
-    processedText = processedText.replace(/(?:^|\n)(?:this\s+)?(?:section|Section)\s*(\d+)(?:\s+is)?/gi, (match, num) => {
-      // Convert the number to a string and increment it by 1
-      const sectionNum = parseInt(num, 10) + 1;
-      return `\n\n**Section ${sectionNum}:**`;
-    });
-
-    // Add styling to make sections more distinct
-    processedText = processedText.replace(/\*\*(Section \d+):\*\*/g, (match, section) => {
-      return `<span class="font-semibold ${isDark ? 'text-purple-300' : 'text-purple-700'}">${section}</span>`;
-    });
-
-    return processedText;
-  };
+  // Build a map of unique references by section/id
+  const uniqueReferences: Record<string, { section: string, text: string, pages: string }> = {};
+  citations.forEach((citation: any) => {
+    const key = citation.section || citation.id || citation.text;
+    if (!uniqueReferences[key]) {
+      uniqueReferences[key] = {
+        section: citation.section || key,
+        text: citation.text || '',
+        pages: citation.page || citation.text || ''
+      };
+    } else {
+      // Merge pages if needed
+      const existingPages = getUniquePages(uniqueReferences[key].pages);
+      const newPages = getUniquePages(citation.page || citation.text || '');
+      uniqueReferences[key].pages = Array.from(new Set([...existingPages, ...newPages])).join(', ');
+    }
+  });
 
   return (
     <motion.div
@@ -424,21 +302,8 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
     >
-      <Card 
-        className={`backdrop-blur-xl border ${isDark ? 'border-white/20' : 'border-black/10'} shadow-2xl ${isDark ? 'text-white' : 'text-zinc-800'} overflow-hidden`}
-        style={{
-          background: isDark 
-            ? 'rgba(30, 41, 59, 0.3)'
-            : 'rgba(255, 255, 255, 0.3)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
-          borderRadius: 24,
-          boxShadow: isDark
-            ? '0 12px 32px 0 rgba(31, 38, 135, 0.25), 0 1.5px 8px 0 rgba(255,255,255,0.08) inset'
-            : '0 12px 32px 0 rgba(31, 38, 135, 0.10), 0 1.5px 8px 0 rgba(0,0,0,0.04) inset',
-        }}
-      >
-        <CardContent className="p-6">
+      <Card className={`backdrop-blur-xl border ${isDark ? 'border-white/20 bg-black/40' : 'border-black/10 bg-white/40'} shadow-2xl ${isDark ? 'text-white' : 'text-zinc-800'} overflow-hidden`}>
+        <CardContent className="p-4">
           <div className="flex flex-col gap-6">
             {/* Error Message */}
             {hasError && (
@@ -451,10 +316,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
             {hasAnswer ? (
               <AnswerSection content={data.answer} />
             ) : (
-              <div 
-                className={`p-6 rounded-xl border-l-4 ${isDark ? 'border-red-500' : 'border-red-600'}`}
-                style={sectionBackgroundStyle}
-              >
+              <div className={`p-6 rounded-xl border-l-4 ${isDark ? 'bg-red-900/20 border-red-500' : 'bg-red-50 border-red-600'}`}>
                 <h3 className={`text-xl font-bold mb-3 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
                   Answer Not Generated
                 </h3>
@@ -465,17 +327,11 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
               </div>
             )}
 
-            {/* Reasoning Section */}
+            {/* Reasoning Section (moved up, visually matches Relevant Paragraphs) */}
             {hasReasoning && (
               <CollapsibleSection title="Reasoning" bgColorClass="bg-purple-900/60">
-                <div 
-                  className={`rounded-lg border ${isDark ? 'border-purple-800' : 'border-purple-300'} p-4 shadow-sm`}
-                  style={sectionBackgroundStyle}
-                >
-                  <div 
-                    className={`text-base whitespace-pre-line ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
-                    dangerouslySetInnerHTML={{ __html: processReasoning(data.reasoning) }}
-                  />
+                <div className="p-3 rounded-lg bg-white/5 relative group">
+                  <p className={`text-base ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{data.reasoning}</p>
                 </div>
               </CollapsibleSection>
             )}
@@ -485,20 +341,36 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
               <CollapsibleSection title="Relevant Paragraphs" bgColorClass="bg-purple-900/60">
                 <div className="space-y-4">
                   {paragraphs.map((paragraph: any, idx: number) => (
-                    <div 
-                      key={idx} 
-                      className={`p-4 rounded-lg border ${isDark ? 'border-purple-800' : 'border-purple-300'} relative group shadow-sm`}
-                      style={sectionBackgroundStyle}
-                    >
+                    <div key={idx} className="p-3 rounded-lg bg-white/5 relative group">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className={`font-semibold m-0 ${isDark ? 'text-purple-200' : 'text-purple-800'}`}>Section {idx + 1}</h4>
+                        <h4 className={`font-semibold m-0 ${isDark ? 'text-purple-200' : 'text-purple-800'}`}>Section {paragraph.id}</h4>
                         <CopyButton text={`${paragraph.text}`} variant="subsection" />
                       </div>
-                      <div className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                        <ShowMoreLess text={paragraph.text} />
-                      </div>
+                      <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{paragraph.text}</p>
                       {paragraph.pages && (
                         <div className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{renderUniquePageLinks(paragraph.pages)}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            )}
+
+            {/* Citations/References Section - refactored */}
+            {Object.keys(uniqueReferences).length > 0 && (
+              <CollapsibleSection title="References" bgColorClass="bg-purple-900/60">
+                <div className="space-y-4">
+                  {Object.values(uniqueReferences).map((ref, idx) => (
+                    <div key={idx} className="p-3 rounded-lg bg-white/5 relative group">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className={`font-semibold m-0 ${isDark ? 'text-purple-200' : 'text-purple-800'}`}>{ref.section}</h4>
+                        <CopyButton text={`${ref.section}\n${ref.text}`} variant="subsection" />
+                      </div>
+                      {ref.text && (
+                        <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{ref.text}</p>
+                      )}
+                      {ref.pages && (
+                        <div className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{renderUniquePageLinks(ref.pages)}</div>
                       )}
                     </div>
                   ))}

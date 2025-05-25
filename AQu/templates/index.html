@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FAQu for Reliance</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
         .section {
             margin-bottom: 1rem;
             border: 1px solid #dee2e6;
             border-radius: 0.25rem;
+            background-color: #fff;
         }
         .section-header {
             padding: 0.75rem 1rem;
@@ -18,10 +20,12 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid #dee2e6;
         }
         .section-content {
             padding: 1rem;
             display: none;
+            background-color: #fff;
         }
         .section-content.show {
             display: block;
@@ -32,10 +36,11 @@
             margin: 1rem 0;
         }
         #answer {
-            background-color: #e9ecef;
+            background-color: #f8f9fa;
             padding: 1rem;
             border-radius: 0.25rem;
             margin-top: 1rem;
+            border: 1px solid #dee2e6;
         }
         .citations {
             margin-top: 0.5rem;
@@ -46,22 +51,40 @@
             display: inline-block;
             margin-right: 0.5rem;
             padding: 0.2rem 0.5rem;
-            background-color: #dee2e6;
+            background-color: #e9ecef;
             border-radius: 0.25rem;
+            text-decoration: none;
+            color: #0d6efd;
+        }
+        .citation:hover {
+            background-color: #dee2e6;
+            color: #0a58ca;
         }
         .paragraph {
             margin-bottom: 1rem;
             padding: 1rem;
             background-color: #f8f9fa;
             border-radius: 0.25rem;
+            border: 1px solid #dee2e6;
         }
         .page-number {
             font-weight: bold;
             color: #0d6efd;
             margin-bottom: 0.5rem;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .page-number:hover {
+            color: #0a58ca;
         }
         .pdf-link {
             margin-bottom: 1rem;
+        }
+        .pdf-link a {
+            text-decoration: none;
+        }
+        .pdf-link a:hover {
+            text-decoration: underline;
         }
         .initialization-screen {
             position: fixed;
@@ -88,6 +111,24 @@
         }
         .pdf-selector select {
             max-width: 300px;
+        }
+        .copy-icon {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-left: 8px;
+            padding: 4px;
+            border-radius: 4px;
+            color: #1d4ed8;
+        }
+        .copy-icon:hover {
+            color: #1e40af;
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        .section-copy-icon {
+            font-size: 1.1rem;
+        }
+        .subsection-copy-icon {
+            font-size: 0.9rem;
         }
     </style>
 </head>
@@ -117,7 +158,7 @@
         
         <div class="pdf-link">
             <a href="#" id="pdfViewLink" target="_blank" class="btn btn-outline-primary">
-                <i class="bi bi-file-pdf"></i> View PDF Document
+                <i class="fas fa-file-pdf"></i> View PDF Document
             </a>
         </div>
         
@@ -162,7 +203,60 @@
         // Update page title with current PDF name
         function updatePageTitle(pdfName) {
             document.title = `FAQu for Reliance - ${pdfName}`;
-            document.getElementById('pdfViewLink').href = `/pdf/${pdfName}`;
+            const pdfLink = document.getElementById('pdfViewLink');
+            pdfLink.href = `/pdf/${pdfName}`;
+            pdfLink.innerHTML = `<i class="fas fa-file-pdf"></i> View ${pdfName}`;
+        }
+
+        // Function to handle page number clicks
+        function handlePageClick(pageNumber) {
+            const pdfLink = document.getElementById('pdfViewLink');
+            const currentPdf = pdfLink.href.split('/').pop();
+            window.open(`/pdf/${currentPdf}#page=${pageNumber}`, '_blank');
+        }
+
+        // Function to format citations with clickable page numbers
+        function formatCitations(citations) {
+            const citationsDiv = document.getElementById('citations');
+            citationsDiv.innerHTML = '';
+            
+            citations.forEach(citation => {
+                const citationElement = document.createElement('span');
+                citationElement.className = 'citation';
+                
+                if (citation.startsWith('Page ')) {
+                    const pageNumbers = citation.replace('Page ', '').split(', ');
+                    const pageLinks = pageNumbers.map(page => 
+                        `<span class="page-number" onclick="handlePageClick(${page})">Page ${page}</span>`
+                    ).join(', ');
+                    citationElement.innerHTML = pageLinks;
+                } else {
+                    citationElement.textContent = citation;
+                }
+                
+                citationsDiv.appendChild(citationElement);
+            });
+        }
+
+        // Function to format relevant paragraphs with clickable page numbers
+        function formatParagraphs(paragraphs) {
+            const paragraphsDiv = document.getElementById('paragraphs');
+            paragraphsDiv.innerHTML = '';
+            
+            paragraphs.forEach(paragraph => {
+                const paragraphElement = document.createElement('div');
+                paragraphElement.className = 'paragraph';
+                
+                if (paragraph.pages && paragraph.pages.length > 0) {
+                    const pageLinks = paragraph.pages.map(page => 
+                        `<span class="page-number" onclick="handlePageClick(${page})">Page ${page}</span>`
+                    ).join(', ');
+                    paragraphElement.innerHTML = `<div class="page-number">${pageLinks}</div>`;
+                }
+                
+                paragraphElement.innerHTML += `<div class="paragraph-text">${paragraph.text}</div>`;
+                paragraphsDiv.appendChild(paragraphElement);
+            });
         }
 
         // Change PDF document
@@ -174,7 +268,7 @@
             document.getElementById('mainContent').style.display = 'none';
             
             try {
-                const response = await fetch('/change-pdf', {
+                const response = await fetch('/api/change-pdf', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -201,7 +295,7 @@
         // Check initialization status
         async function checkInitialization() {
             try {
-                const response = await fetch('/loading-status');
+                const response = await fetch('/api/loading-status');
                 const data = await response.json();
                 
                 // Update progress bar
@@ -243,25 +337,17 @@
             icon.textContent = content.classList.contains('show') ? '▼' : '▶';
         }
 
+        // Update the search function to use the new formatting functions
         async function search() {
-            const question = document.getElementById('question').value.trim();
-            if (!question) {
-                // Show error in UI instead of alert
-                const errorMessage = document.getElementById('error-message');
-                errorMessage.textContent = 'Please enter a question.';
-                errorMessage.style.display = 'block';
-                document.getElementById('result').style.display = 'block';
-                return;
-            }
+            const question = document.getElementById('question').value;
+            if (!question) return;
 
-            // Show loading
             document.querySelector('.loading').style.display = 'block';
             document.getElementById('result').style.display = 'none';
             document.getElementById('error-message').style.display = 'none';
-            document.getElementById('loading-message').textContent = 'Analyzing document chunks...';
 
             try {
-                const response = await fetch('/search', {
+                const response = await fetch('/api/ask', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -271,106 +357,21 @@
 
                 const data = await response.json();
                 
-                // Update loading message with status
-                if (data.status_message) {
-                    document.getElementById('loading-message').textContent = data.status_message;
-                }
-                
-                // Show result container
-                document.getElementById('result').style.display = 'block';
-                
-                // Handle initialization state
-                if (data.is_initializing) {
-                    const errorMessage = document.getElementById('error-message');
-                    errorMessage.textContent = data.error;
-                    errorMessage.style.display = 'block';
-                    document.getElementById('answer').style.display = 'none';
-                    document.getElementById('citations').style.display = 'none';
-                    document.getElementById('paragraphs').innerHTML = '';
-                    return;
-                }
-                
-                if (data.error) {
-                    // Display error message in the UI
-                    const errorMessage = document.getElementById('error-message');
-                    errorMessage.textContent = data.error;
-                    errorMessage.style.display = 'block';
-                    
-                    // Clear other sections
-                    document.getElementById('answer').style.display = 'none';
-                    document.getElementById('citations').style.display = 'none';
-                    document.getElementById('paragraphs').innerHTML = '';
-                    
-                    // If we have reasoning, show it
-                    if (data.reasoning) {
-                        document.getElementById('reasoning').textContent = data.reasoning;
-                    }
-                    
-                    // If we have relevant paragraphs, show them
-                    if (data.relevant_paragraphs && data.relevant_paragraphs.length > 0) {
-                        document.getElementById('paragraphs').innerHTML = data.relevant_paragraphs
-                            .map(p => `
-                                <div class="paragraph">
-                                    <div class="page-number">${p.pages}</div>
-                                    <div class="paragraph-text">${p.text}</div>
-                                </div>
-                            `)
-                            .join('');
-                    }
+                if (response.ok) {
+                    document.getElementById('answer').innerHTML = data.answer;
+                    formatCitations(data.citations);
+                    formatParagraphs(data.relevant_paragraphs);
+                    document.getElementById('reasoning').innerHTML = data.reasoning;
+                    document.getElementById('result').style.display = 'block';
                 } else {
-                    // Clear any previous error message
-                    document.getElementById('error-message').style.display = 'none';
-                    
-                    // Update UI with results
-                    document.getElementById('reasoning').textContent = data.reasoning || 'No reasoning provided.';
-                    
-                    // Format paragraphs with page numbers
-                    if (data.relevant_paragraphs && data.relevant_paragraphs.length > 0) {
-                        document.getElementById('paragraphs').innerHTML = data.relevant_paragraphs
-                            .map(p => `
-                                <div class="paragraph">
-                                    <div class="page-number">${p.pages}</div>
-                                    <div class="paragraph-text">${p.text}</div>
-                                </div>
-                            `)
-                            .join('');
-                    } else {
-                        document.getElementById('paragraphs').innerHTML = '<p>No relevant paragraphs found.</p>';
-                    }
-                    
-                    if (data.answer) {
-                        document.getElementById('answer').textContent = data.answer;
-                        document.getElementById('answer').style.display = 'block';
-                    } else {
-                        document.getElementById('answer').style.display = 'none';
-                    }
-                    
-                    // Display citations if available
-                    if (data.citations && data.citations.length > 0) {
-                        const citationsHtml = data.citations
-                            .map(citation => `<span class="citation">${citation}</span>`)
-                            .join('');
-                        document.getElementById('citations').innerHTML = citationsHtml;
-                        document.getElementById('citations').style.display = 'block';
-                    } else {
-                        document.getElementById('citations').style.display = 'none';
-                    }
+                    document.getElementById('error-message').textContent = data.error || 'An error occurred';
+                    document.getElementById('error-message').style.display = 'block';
                 }
             } catch (error) {
-                // Display error message in the UI
-                const errorMessage = document.getElementById('error-message');
-                errorMessage.textContent = 'An error occurred while processing your question. Please try again.';
-                errorMessage.style.display = 'block';
-                
-                // Clear other sections
-                document.getElementById('answer').style.display = 'none';
-                document.getElementById('citations').style.display = 'none';
-                document.getElementById('paragraphs').innerHTML = '';
+                document.getElementById('error-message').textContent = 'Failed to process question';
+                document.getElementById('error-message').style.display = 'block';
             } finally {
-                // Keep the loading message visible for a moment to show the final status
-                setTimeout(() => {
-                    document.querySelector('.loading').style.display = 'none';
-                }, 1000);
+                document.querySelector('.loading').style.display = 'none';
             }
         }
 
@@ -392,6 +393,20 @@
             // Start checking initialization status
             checkInitialization();
         });
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show a temporary success message
+                const icon = event.target;
+                const originalClass = icon.className;
+                icon.className = 'fa-solid fa-check copy-icon';
+                setTimeout(() => {
+                    icon.className = originalClass;
+                }, 1000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
     </script>
 </body>
 </html> 

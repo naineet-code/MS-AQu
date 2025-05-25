@@ -8,7 +8,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogClose } from "
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 // PDF and control icons
-import { FileText, X, Maximize2, History, ChevronDown, ChevronUp, Trash2, HelpCircle } from "lucide-react";
+import { FileText, X, Maximize2, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2 } from "lucide-react";
 import { ThemeToggle, themeChangeEvent, THEME_CHANGE_EVENT } from "@/components/ui/theme-toggle";
 import ChatHistory from "./ChatHistory";
 import { useChatHistory } from "@/hooks/useChatHistory";
@@ -16,7 +16,9 @@ import { useTheme } from "@/hooks/useTheme";
 import QuestionResponseSection from "./QuestionResponseSection";
 import { formatDistanceToNow } from 'date-fns';
 import { marked } from 'marked';
+import { aiFormatter } from '@/utils/aiFormatter';
 import HelpScreen from "./HelpScreen";
+import { BACKEND_URL } from "@/config";
 
 // Funny FAQ initialization steps - randomized for variety
 const funnyInitSteps = [
@@ -118,6 +120,9 @@ export default function FAQPage() {
   const [isReturnedFromResponse, setIsReturnedFromResponse] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showHelpScreen, setShowHelpScreen] = useState(false);
+  const [showPdfDialog, setShowPdfDialog] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState("");
   
   const toggleMessageExpansion = (messageId: string) => {
     setExpandedMessages(prev => {
@@ -225,7 +230,7 @@ export default function FAQPage() {
   useEffect(() => {
     const initializeSystem = async () => {
       try {
-        await fetch('http://57.154.209.147:6001/change-pdf', {
+        await fetch(`${BACKEND_URL}/change-pdf`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pdf_name: 'source.pdf' }),
@@ -251,7 +256,7 @@ export default function FAQPage() {
   const handleSubmitQuestion = async (question: string) => {
     setLoading(true);
     try {
-      const res = await fetch('http://57.154.209.147:6001/search', {
+      const res = await fetch(`${BACKEND_URL}/api/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question, pdf_name: 'source.pdf' }),
@@ -301,77 +306,6 @@ export default function FAQPage() {
 
       {/* Top Navigation Bar */}
       <div className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center p-4">
-        {/* Left side - PDF Viewer and Help */}
-        <div className="flex items-center gap-2">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              size="icon"
-              variant="secondary"
-              aria-label="View PDF"
-              className="transform transition-transform duration-200 ease-in-out hover:scale-110"
-            >
-              <FileText className="h-5 w-5 hover:animate-pulse" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-6xl w-[90vw] h-[90vh] p-0 gap-0">
-            {/* Header with Title and Controls */}
-            <div className="relative flex items-center p-4 border-b bg-gray-50 dark:bg-gray-900">
-              {/* Document Title */}
-              <DialogTitle className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex-1 pr-20">
-                FAQ PDF Document
-              </DialogTitle>
-              
-              {/* Controls Container - positioned to avoid close button */}
-              <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  aria-label="Fullscreen PDF"
-                  onClick={() => {
-                    const iframe = document.getElementById('faq-pdf-iframe');
-                    if (iframe && iframe.requestFullscreen) {
-                      iframe.requestFullscreen();
-                    }
-                  }}
-                  className="h-8 w-8"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {/* Note: DialogContent automatically adds close button in top-right */}
-            </div>
-            {/* PDF Viewer */}
-            <iframe
-              id="faq-pdf-iframe"
-              src="http://57.154.209.147:6001/pdf/source.pdf"
-              title="FAQ PDF"
-              className="w-full flex-1 border-0"
-              style={{ height: 'calc(90vh - 80px)' }}
-            />
-          </DialogContent>
-        </Dialog>
-
-        {/* Help Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="secondary"
-              aria-label="Help & How to Use"
-              onClick={() => setShowHelpScreen(true)}
-              className="transform transition-transform duration-200 ease-in-out hover:scale-110"
-            >
-              <HelpCircle className="h-5 w-5 hover:animate-pulse" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Help & How to Use</p>
-          </TooltipContent>
-        </Tooltip>
-        </div>
-
         {/* Right side - Theme Toggle (only visible in question mode) */}
         {questionMode && !isInputFocused && !isReturnedFromResponse && (
           <ThemeToggle />
@@ -428,17 +362,126 @@ export default function FAQPage() {
         </div>
       </div>
 
+      {/* Bottom Navigation Bar */}
+      <div className="fixed bottom-16 left-4 z-20 flex items-center gap-2">
+        {/* PDF Viewer Button and Dialog */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="secondary"
+              aria-label="View PDF"
+              className="transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
+              onClick={() => {
+                setShowPdfDialog(true);
+                setPdfError("");
+              }}
+            >
+              <FileText className="h-5 w-5 hover:animate-pulse" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>View PDF Document</p>
+          </TooltipContent>
+        </Tooltip>
+        {showPdfDialog && (
+          <Dialog open={showPdfDialog} onOpenChange={setShowPdfDialog}>
+            <DialogContent className="max-w-6xl w-[90vw] h-[90vh] p-0 gap-0">
+              {/* Header with Title and Controls */}
+              <div className="relative flex items-center p-4 border-b bg-gray-50 dark:bg-gray-900">
+                <DialogTitle className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex-1 pr-20">
+                  FAQ PDF Document
+                </DialogTitle>
+                {/* Controls Container - positioned to avoid close button */}
+                <div className="absolute right-16 top-4">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    aria-label="Fullscreen PDF"
+                    onClick={() => {
+                      const iframe = document.getElementById('faq-pdf-iframe');
+                      if (iframe && iframe.requestFullscreen) {
+                        iframe.requestFullscreen();
+                      }
+                    }}
+                    className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <DialogClose asChild>
+                  <Button size="icon" variant="ghost" aria-label="Close PDF Dialog" className="h-8 w-8 ml-2">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogClose>
+              </div>
+              {/* PDF Viewer */}
+              <div className="w-full h-full flex items-center justify-center relative" style={{ minHeight: 'calc(90vh - 80px)' }}>
+                {pdfLoading && !pdfError && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10 bg-white/60 dark:bg-black/60">
+                    <Loader2 className="animate-spin h-10 w-10 text-purple-600" />
+                  </div>
+                )}
+                {pdfError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-white/80 dark:bg-black/80">
+                    <p className="text-red-600 dark:text-red-400 font-semibold mb-2">Failed to load PDF.</p>
+                    <p className="text-xs text-gray-500">{pdfError}</p>
+                  </div>
+                )}
+                <iframe
+                  id="faq-pdf-iframe"
+                  src={`${BACKEND_URL}/pdf/source.pdf`}
+                  title="FAQ PDF"
+                  className="w-full h-full border-0 relative z-0"
+                  style={{ minHeight: 'calc(90vh - 80px)' }}
+                  onLoad={() => setPdfLoading(false)}
+                  onError={() => {
+                    setPdfLoading(false);
+                    setPdfError('Could not load the PDF. Please check your connection or try again later.');
+                  }}
+                  onLoadStart={() => setPdfLoading(true)}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+        {/* Help Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="secondary"
+              aria-label="Help & How to Use"
+              onClick={() => setShowHelpScreen(true)}
+              className="transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
+            >
+              <HelpCircle className="h-5 w-5 hover:animate-pulse" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Help & How to Use</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
       {/* Chat History Button and Panel */}
       <div className="fixed bottom-16 right-4 z-20">
-        <Button
-          size="icon"
-          variant="secondary"
-          aria-label="Chat History"
-          onClick={() => setShowChatHistory(!showChatHistory)}
-          className="transform transition-transform duration-200 ease-in-out hover:scale-110 rounded-full backdrop-blur-sm border"
-        >
-          <History className="h-5 w-5 hover:animate-pulse" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="secondary"
+              aria-label="Chat History"
+              onClick={() => setShowChatHistory(!showChatHistory)}
+              className="transform transition-transform duration-200 ease-in-out hover:animate-hover-tada rounded-full backdrop-blur-sm border"
+            >
+              <History className="h-5 w-5 hover:animate-pulse" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Chat History</p>
+          </TooltipContent>
+        </Tooltip>
 
         {/* Floating Chat History Panel */}
         <AnimatePresence>
@@ -480,7 +523,7 @@ export default function FAQPage() {
                             clearHistory();
                           }
                         }}
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
                         aria-label="Clear Chat History"
                         disabled={chatHistory.length === 0}
                       >
@@ -494,7 +537,7 @@ export default function FAQPage() {
                     size="icon"
                     variant="ghost"
                     onClick={() => setShowChatHistory(false)}
-                    className="h-8 w-8"
+                    className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
                     aria-label="Close Chat History"
                   >
                     <X className="h-4 w-4" />
@@ -536,7 +579,7 @@ export default function FAQPage() {
                           {msg.isUser ? (
                             // User messages: always show full text (questions are usually short)
                             <span
-                              dangerouslySetInnerHTML={{ __html: marked.parse(msg.message || '') }}
+                              dangerouslySetInnerHTML={{ __html: marked.parse(aiFormatter.formatAnswer(msg.message || '')) }}
                             />
                           ) : (
                             // Bot messages: truncate long answers
@@ -544,9 +587,11 @@ export default function FAQPage() {
                               <span
                                 dangerouslySetInnerHTML={{ 
                                   __html: marked.parse(
-                                    expandedMessages.has(msg.id) 
-                                      ? msg.message || ''
-                                      : truncateMessage(msg.message || '')
+                                    aiFormatter.formatAnswer(
+                                      expandedMessages.has(msg.id) 
+                                        ? msg.message || ''
+                                        : truncateMessage(msg.message || '')
+                                    )
                                   ) 
                                 }}
                               />
@@ -555,7 +600,7 @@ export default function FAQPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => toggleMessageExpansion(msg.id)}
-                                  className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 ${
+                                  className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada ${
                                     isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
                                   }`}
                                 >

@@ -2,3 +2,5 @@ Flask
 python-dotenv
 pypdf
 openai
+tiktoken
+nltk

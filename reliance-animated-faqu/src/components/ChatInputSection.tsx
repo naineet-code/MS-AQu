@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
+import { ButtonState } from "@/components/ui/submit-button";
 import { MovingBorderCard } from "@/components/ui/moving-border-card";
 import { motion } from "motion/react";
 import { useTheme } from "@/hooks/useTheme";
@@ -34,16 +34,17 @@ const defaultPlaceholders = [
   "How is ASP calculated for projected weeks in WSSI?",
   "What factors determine COGS in projected periods?",
   "How is discount% calculated for actual and projected sales?",
-  "Why use last year’s performance in current planning?",
+  "Why use last year's performance in current planning?",
   "How does WSSI determine the sales channel for a style?",
   "How do shelf life and lead time affect style flow in WSSI?",
   "How is inventory handling different for new vs aged styles?",
   "How does WSSI align planned inwards with expected sales?",
-  "What metrics are displayed in WSSI’s Sales Metrics panel?",
+  "What metrics are displayed in WSSI's Sales Metrics panel?",
   "How is data aggregated before display in WSSI dashboards?",
   "Why might discount% in future weeks appear inconsistent?",
-  "How does WSSI support stock planning via ‘Weeks of Cover’?"
+  "How does WSSI support stock planning via 'Weeks of Cover'?"
 ];
+
 const ChatInputSection: React.FC<ChatInputSectionProps> = ({
   isInputFocused,
   setIsInputFocused,
@@ -63,6 +64,19 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
   
   // Use the static sample questions
   const chatPlaceholders = defaultPlaceholders;
+  
+  // Determine button state based on current interaction state
+  const getButtonState = (): ButtonState => {
+    if (isReturnedFromResponse) {
+      return 'new-question'; // User clicked "New Question" - button on right, input ready
+    } else if (isInputFocused) {
+      return 'active'; // User is typing/focused - button on right
+    } else {
+      return 'initial'; // Default state - button towards top center
+    }
+  };
+  
+  const buttonState = getButtonState();
 
   useEffect(() => {
     // Auto-focus the input when the component loads with autoFocus prop
@@ -84,13 +98,17 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
     const message = inputField ? inputField.value.trim() : '';
     if (!message) return;
     console.log("Submitted question:", message);
+    
     // Add user message
     onAddMessage(message, true);
+    
     // Clear input
     if (inputRef.current) inputRef.current.value = '';
+    
     // Transition to response view
     setQuestionMode(false);
     setShowResponse(true);
+    
     // Fetch answer from backend
     try {
       const data = await onSubmitQuestion(message);
@@ -155,6 +173,7 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
               inputRef={inputRef}
+              buttonState={buttonState}
             />
           </CardContent>
         </Card>

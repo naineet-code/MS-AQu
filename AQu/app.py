@@ -3,21 +3,18 @@ from new_search import (
     navigate_to_paragraphs,
     generate_answer,
     split_into_50_chunks,
-    route_chunks,
-    LegalAnswer
+    route_chunks
 )
 import os
-import re
 from dotenv import load_dotenv
-import threading
 import time
 from pypdf import PdfReader
 from openai import OpenAI
-
-# For logging interactions
+import re
+import threading
 import json
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static', static_url_path='')
 load_dotenv()
 
 @app.after_request
@@ -145,14 +142,69 @@ def initialize_document(pdf_name=None):
 
 @app.route('/')
 def home():
-    available_pdfs = get_available_pdfs()
-    return render_template('index.html', pdfs=available_pdfs)
+    return render_template('index.html', pdfs=get_available_pdfs())
 
-@app.route('/pdf/<path:filename>')
-def serve_pdf(filename):
-    return send_from_directory('pdf', filename)
+@app.route('/api/ask', methods=['POST'])
+def ask_question():
+    if not document_chunks:
+        return jsonify({'error': 'No document loaded'}), 400
 
-@app.route('/loading-status')
+    question = request.json.get('question')
+    if not question:
+        return jsonify({'error': 'No question provided'}), 400
+
+    try:
+        # Get relevant paragraphs and scratchpad
+        result = navigate_to_paragraphs(document_text, question, max_depth=1, chunks=document_chunks)
+        relevant_paragraphs = result["paragraphs"]
+        scratchpad = result["scratchpad"]
+        
+        # Generate answer
+        answer = generate_answer(question, relevant_paragraphs, scratchpad)
+        
+        # Format the response
+        response_data = {
+            'answer': answer.answer if hasattr(answer, 'answer') else answer.get('answer', ''),
+            'citations': [],
+            'relevant_paragraphs': [],
+            'reasoning': scratchpad
+        }
+        
+        # Format citations and relevant paragraphs
+        for paragraph in relevant_paragraphs:
+            # Add citation if pages are available
+            if 'pages' in paragraph and paragraph['pages']:
+                page_numbers = sorted(paragraph['pages'])
+                response_data['citations'].append({
+                    'section': f'Section {paragraph.get("id", "Unknown")}',
+                    'text': f'Page {", ".join(map(str, page_numbers))}',
+                    'page': ', '.join(map(str, page_numbers))
+                })
+            
+            # Add relevant paragraph with text and pages
+            if 'text' in paragraph:
+                response_data['relevant_paragraphs'].append({
+                    'id': paragraph.get('id', 'Unknown'),
+                    'text': paragraph['text'],
+                    'pages': f'Page {", ".join(map(str, sorted(paragraph.get("pages", []))))}'
+                })
+
+        # Add citations from the answer object
+        if hasattr(answer, 'citations'):
+            for citation in answer.citations:
+                if isinstance(citation, dict) and 'text' in citation:
+                    response_data['citations'].append({
+                        'section': citation.get('section', 'Unknown'),
+                        'text': citation['text'],
+                        'page': citation.get('page', '')
+                    })
+
+        return jsonify(response_data)
+    except Exception as e:
+        print(f"Error processing question: {str(e)}")
+        return jsonify({'error': 'Failed to process question'}), 500
+
+@app.route('/api/loading-status')
 def loading_status():
     status_info = {
         'is_loading': is_loading,
@@ -178,223 +230,32 @@ def loading_status():
             
     return jsonify(status_info)
 
-@app.route('/available-pdfs')
+@app.route('/api/available-pdfs')
 def available_pdfs():
     return jsonify(get_available_pdfs())
 
-@app.route('/change-pdf', methods=['POST'])
+@app.route('/api/change-pdf', methods=['POST'])
 def change_pdf():
     pdf_name = request.json.get('pdf_name')
     if not pdf_name:
-        return jsonify({'error': 'No PDF name provided'})
+        return jsonify({'error': 'No PDF name provided'}), 400
         
     # Start initialization in a new thread
     init_thread = threading.Thread(target=initialize_document, args=(pdf_name,))
     init_thread.start()
     
     return jsonify({'message': 'PDF change initiated'})
-   
-@app.route('/sample-questions')
-def sample_questions():
-    """Extract up to 5 sample questions (lines ending with '?') from the loaded PDF pages."""
-    if not pdf_pages:
-        return jsonify([])
-    questions = []
-    for page in pdf_pages:
-        if not page:
-            continue
-        for line in page.splitlines():
-            text = line.strip()
-            if text.endswith('?'):
-                questions.append(text)
-        if len(questions) >= 5:
-            break
-    return jsonify(questions[:5])
 
-@app.route('/search', methods=['POST'])
-def search():
-    if is_loading:
-        return jsonify({
-            'error': 'System is still initializing. Please wait.',
-            'is_initializing': True,
-            'status_message': 'System is still initializing. Please wait.'
-        })
-        
-    question = request.json.get('question')
-    pdf_name = request.json.get('pdf_name', 'source.pdf')  # Default to source.pdf
-    
-    if not question:
-        return jsonify({
-            'error': 'No question provided',
-            'is_initializing': False,
-            'status_message': 'Please enter a question'
-        })
-    
-    # Check if we need to switch PDFs
-    if current_pdf != pdf_name:
-        print(f"Switching from {current_pdf} to {pdf_name}")
-        initialize_document(pdf_name)
-        # Wait for initialization to complete
-        while is_loading:
-            time.sleep(0.1)
-        if not document_chunks:
-            return jsonify({
-                'error': f'Failed to load PDF {pdf_name}',
-                'is_initializing': False,
-                'status_message': f'Could not load PDF {pdf_name}'
-            })
-    
-    # Sanitize question to only alphanumeric and spaces to avoid prompt errors
-    question = re.sub(r'[^A-Za-z0-9 ]+', ' ', question).strip()
-    # Sanitize question
-    question = re.sub(r'[^A-Za-z0-9 ]+', ' ', question).strip()
+@app.route('/pdf/<path:filename>')
+def serve_pdf(filename):
     try:
-        # First, route the chunks to find relevant ones
-        routing_result = route_chunks(
-            question=question,
-            chunks=document_chunks,
-            depth=0,
-            scratchpad=""
-        )
-        
-        # Get selected chunks
-        selected_ids = routing_result["selected_ids"]
-        print(f"Selected IDs from routing: {selected_ids}")
-        
-        # If no chunks were selected but we have reasoning, try to extract chunk numbers from the reasoning
-        if not selected_ids and routing_result.get('scratchpad'):
-            # Try to find chunk numbers mentioned in the reasoning
-            chunk_matches = re.findall(r'Chunk[s]?\s+(\d+)', routing_result['scratchpad'])
-            if chunk_matches:
-                selected_ids = [int(id) for id in chunk_matches]
-                print(f"Extracted chunk IDs from reasoning: {selected_ids}")
-        
-        selected_chunks = [c for c in document_chunks if c["id"] in selected_ids]
-        
-        print(f"Found {len(selected_chunks)} relevant chunks")
-        for chunk in selected_chunks:
-            print(f"Chunk {chunk['id']}: {chunk['text'][:100]}... (Pages: {chunk['pages']})")
-        
-        if not selected_chunks:
-            resp = {
-                'error': None,
-                'reasoning': routing_result.get('scratchpad', ''),
-                'relevant_paragraphs': [],
-                'answer': None,
-                'citations': [],
-                'pdf_url': f'/pdf/{current_pdf}',
-                'is_initializing': False,
-                'status_message': f'Analyzed {len(document_chunks)} chunks, but found no relevant information'
-            }
-            # Log interaction
-            try:
-                with open('logs.jsonl', 'a') as logf:
-                    entry = {'timestamp': time.time(), 'question': question, 'response': resp}
-                    logf.write(json.dumps(entry) + '\n')
-            except Exception:
-                pass
-            return jsonify(resp)
-        
-        # Generate the answer using the selected chunks
-        try:
-            answer_result = generate_answer(
-                question=question,
-                paragraphs=selected_chunks,
-                scratchpad=routing_result['scratchpad']
-            )
-            
-            if not answer_result or not answer_result.answer:
-                resp = {
-                    'error': None,
-                    'reasoning': routing_result['scratchpad'],
-                    'relevant_paragraphs': [{
-                        'text': p['text'],
-                        'id': str(p['id']),
-                        'pages': f"Pages {min(p['pages'])}-{max(p['pages'])}" if len(p['pages']) > 1 else f"Page {p['pages'][0]}"
-                    } for p in selected_chunks],
-                    'answer': None,
-                    'citations': [],
-                    'pdf_url': f'/pdf/{current_pdf}',
-                    'is_initializing': False,
-                    'status_message': f'Analyzed {len(document_chunks)} chunks, found {len(selected_chunks)} relevant sections, but could not generate answer'
-                }
-                # Log interaction
-                try:
-                    with open('logs.jsonl', 'a') as logf:
-                        entry = {'timestamp': time.time(), 'question': question, 'response': resp}
-                        logf.write(json.dumps(entry) + '\n')
-                except Exception:
-                    pass
-                return jsonify(resp)
-                
-            # Format paragraphs with their IDs and page numbers
-            formatted_paragraphs = []
-            for p in selected_chunks:
-                page_range = f"Pages {min(p['pages'])}-{max(p['pages'])}" if len(p['pages']) > 1 else f"Page {p['pages'][0]}"
-                formatted_paragraphs.append({
-                    'text': p['text'],
-                    'id': str(p['id']),
-                    'pages': page_range
-                })
-            resp = {
-                'reasoning': routing_result['scratchpad'],
-                'relevant_paragraphs': formatted_paragraphs,
-                'answer': answer_result.answer,
-                'citations': answer_result.citations,
-                'pdf_url': f'/pdf/{current_pdf}',
-                'is_initializing': False,
-                'status_message': f'Analyzed {len(document_chunks)} chunks, found {len(selected_chunks)} relevant sections, and generated answer'
-            }
-            # Log interaction
-            try:
-                with open('logs.jsonl', 'a') as logf:
-                    entry = {'timestamp': time.time(), 'question': question, 'response': resp}
-                    logf.write(json.dumps(entry) + '\n')
-            except Exception:
-                pass
-            return jsonify(resp)
-        except Exception as e:
-            print(f"Error generating answer: {str(e)}")
-            # If answer generation fails, return the chunks and reasoning
-            return jsonify({
-                'error': 'Could not generate answer, but found relevant information.',
-                'reasoning': routing_result['scratchpad'],
-                'relevant_paragraphs': [{
-                    'text': p['text'],
-                    'id': str(p['id']),
-                    'pages': f"Pages {min(p['pages'])}-{max(p['pages'])}" if len(p['pages']) > 1 else f"Page {p['pages'][0]}"
-                } for p in selected_chunks],
-                'pdf_url': f'/pdf/{current_pdf}',
-                'is_initializing': False,
-                'status_message': f'Analyzed {len(document_chunks)} chunks, found {len(selected_chunks)} relevant sections, but could not generate answer'
-            })
-            
+        return send_from_directory('pdf', filename, mimetype='application/pdf')
     except Exception as e:
-        print(f"Error processing question: {str(e)}")
-        resp = {
-            'error': str(e),
-            'reasoning': None,
-            'relevant_paragraphs': [],
-            'answer': None,
-            'citations': [],
-            'pdf_url': f'/pdf/{current_pdf}',
-            'is_initializing': False,
-            'status_message': f'Error analyzing chunks: {str(e)}'
-        }
-        # Log interaction error
-        try:
-            with open('logs.jsonl', 'a') as logf:
-                entry = {'timestamp': time.time(), 'question': question, 'response': resp}
-                logf.write(json.dumps(entry) + '\n')
-        except Exception:
-            pass
-        return jsonify(resp)
+        print(f"Error serving PDF: {str(e)}")
+        return jsonify({'error': 'Failed to serve PDF'}), 404
+
+# Initialize the document on startup
+initialize_document()
 
 if __name__ == '__main__':
-    # Start document initialization in a separate thread
-    init_thread = threading.Thread(target=initialize_document)
-    init_thread.start()
-    
-    # Run the Flask app
-    app.run(host='0.0.0.0', port=6001, debug=False)
-    print("Server running on http://localhost:6001") 
+    app.run(debug=True, port=6001) 
