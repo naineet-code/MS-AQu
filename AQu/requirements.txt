@@ -1,6 +1,12 @@
 Flask
-python-dotenv
+python-dotenv==1.0.1
 pypdf
-openai
+openai==1.12.0
 tiktoken
 nltk
+fastapi==0.109.2
+uvicorn==0.27.1
+PyMuPDF==1.23.26
+pydantic==2.6.1
+python-multipart==0.0.9
+aiofiles==23.2.1
