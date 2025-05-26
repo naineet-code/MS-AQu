@@ -1,19 +1,11 @@
 import toml from 'toml';
 
-let backendUrl: string | null = null;
-
 export async function loadBackendUrl(): Promise<string> {
-  if (backendUrl) return backendUrl;
-  
   const response = await fetch('/config.toml');
   const text = await response.text();
   const config = toml.parse(text);
   if (config.backend && config.backend.url) {
-    backendUrl = config.backend.url;
-    return backendUrl;
+    return config.backend.url;
   }
   throw new Error('Backend URL not found in config.toml');
-}
-
-// For backward compatibility
-export const BACKEND_URL = import.meta.env.VITE_APP_BACKEND_URL || 'http://localhost:8000'; 
+} 

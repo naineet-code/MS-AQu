@@ -18,7 +18,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { marked } from 'marked';
 import { aiFormatter } from '@/utils/aiFormatter';
 import HelpScreen from "./HelpScreen";
-import { BACKEND_URL } from "@/config";
+import { loadBackendUrl } from "@/config";
 
 // Funny FAQ initialization steps - randomized for variety
 const funnyInitSteps = [
@@ -123,6 +123,8 @@ export default function FAQPage() {
   const [showPdfDialog, setShowPdfDialog] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState("");
+  const [backendUrl, setBackendUrl] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   
   const toggleMessageExpansion = (messageId: string) => {
     setExpandedMessages(prev => {
@@ -229,11 +231,13 @@ export default function FAQPage() {
   // Always request loading of the single system PDF with initialization loader
   useEffect(() => {
     const initializeSystem = async () => {
+      if (!backendUrl) return;
+      
       try {
-        await fetch(`${BACKEND_URL}/change-pdf`, {
+        await fetch(`${backendUrl}/api/refresh-pdfs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pdf_name: 'source.pdf' }),
+          body: JSON.stringify({ pdf_name: 'reliance_faq.pdf' }),
         });
         // Simulate initialization time for better UX (longer for funny messages)
         setTimeout(() => {
@@ -248,32 +252,49 @@ export default function FAQPage() {
     };
     
     initializeSystem();
+  }, [backendUrl]);
+
+  // Load backend URL from TOML config
+  useEffect(() => {
+    loadBackendUrl()
+      .then(setBackendUrl)
+      .catch((err) => setConfigError(err.message));
   }, []);
 
   /**
    * Submit question to backend and set response data
    */
   const handleSubmitQuestion = async (question: string) => {
+    if (!backendUrl) {
+      throw new Error('Backend URL not loaded');
+    }
+
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/ask`, {
+      const response = await fetch(`${backendUrl}/api/query`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, pdf_name: 'source.pdf' }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          query: question,
+          category: "reliance"  // Adding the required category field
+        }),
       });
-      
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
       }
-      
-      const data = await res.json();
+
+      const data = await response.json();
       setResponseData(data);
-      return data;
-    } catch (err: any) {
-      console.error(err);
-      const errorMsg = err?.message || 'Error contacting server';
-      setResponseData({ error: errorMsg });
-      return { error: errorMsg };
+      setShowResponse(true);
+      setQuestionMode(false);
+      handleAddMessage(question, true);
+      handleAddMessage(data.answer, false);
+    } catch (error) {
+      console.error('Error:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -430,7 +451,7 @@ export default function FAQPage() {
                 )}
                 <iframe
                   id="faq-pdf-iframe"
-                  src={`${BACKEND_URL}/pdf/source.pdf`}
+                  src={`${backendUrl}/pdf/reliance/reliance_faq.pdf`}
                   title="FAQ PDF"
                   className="w-full h-full border-0 relative z-0"
                   style={{ minHeight: 'calc(90vh - 80px)' }}

@@ -232,7 +232,7 @@ export default function FAQPage() {
   useEffect(() => {
     const initializeSystem = async () => {
       try {
-        await fetch(`${BACKEND_URL}/change-pdf`, {
+        await fetch(`${BACKEND_URL}/api/refresh-pdfs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pdf_name: 'algo.pdf' }),
@@ -258,10 +258,14 @@ export default function FAQPage() {
   const handleSubmitQuestion = async (question: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/search`, {
+      const res = await fetch(`${BACKEND_URL}/api/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, pdf_name: 'algo.pdf' }),
+        body: JSON.stringify({ 
+          query: question,
+          category: "merchandising",
+          pdf_name: 'algo.pdf' 
+        }),
       });
       
       if (!res.ok) {

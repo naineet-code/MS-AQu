@@ -12,6 +12,7 @@ logger = get_logger(__name__)
 # Initialize services
 settings = Settings()
 pdf_manager = PDFManager(settings.get("PDF_DIR"))
+pdf_manager.load_pdfs()
 ai_service = AIService()
 
 class QueryRequest(BaseModel):
@@ -38,13 +39,16 @@ async def process_query(request: QueryRequest) -> Dict:
                 raise HTTPException(status_code=404, detail=f"No PDFs found for category {request.category}")
             pdf_info = next(iter(pdfs.values()))
             
-        # Extract relevant text from PDF
-        # TODO: Implement text extraction logic
-        
+        # Extract text from PDF
+        doc = pdf_info['document']
+        text = ""
+        for page in doc:
+            text += page.get_text()
+            
         # Process query with AI
         response = await ai_service.process_query(
             query=request.query,
-            context="Extracted text here",  # TODO: Add extracted text
+            context=text,
             model=settings.get("MODEL_NAME")
         )
         

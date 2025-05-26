@@ -1,3 +1,2 @@
-// Backend URL configuration
-// To use the public server, change the value below to: "http://57.154.209.147:6001"
-export const BACKEND_URL = "http://localhost:6001"; 
+// Backend URL is configured via environment variable VITE_APP_BACKEND_URL
+export const BACKEND_URL = import.meta.env.VITE_APP_BACKEND_URL || 'http://localhost:8000'; 

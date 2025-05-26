@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ThemeProvider, createTheme, CssBaseline, Container, Typography } from '@mui/material';
 import { ChatBox } from './components/ChatBox';
+import { loadBackendUrl } from './configLoader';
 
 const theme = createTheme({
   palette: {
@@ -28,14 +29,27 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
+  const [backendUrl, setBackendUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadBackendUrl()
+      .then(setBackendUrl)
+      .catch((err) => setError(err.message));
+  }, []);
+
   const handleQuestionSubmit = async (question: string) => {
+    if (!backendUrl) throw new Error('Backend URL not loaded');
     try {
-      const response = await fetch('/api/ask', {
+      const response = await fetch(`${backendUrl}/api/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ 
+          query: question,
+          category: "general"  // You may want to make this configurable
+        }),
       });
 
       if (!response.ok) {
@@ -54,6 +68,13 @@ const App: React.FC = () => {
       throw error;
     }
   };
+
+  if (error) {
+    return <div>Error loading config: {error}</div>;
+  }
+  if (!backendUrl) {
+    return <div>Loading configuration...</div>;
+  }
 
   return (
     <ThemeProvider theme={theme}>

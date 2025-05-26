@@ -27,9 +27,9 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 
 try:
-    nltk.data.find('tokenizers/punkt')
+    nltk.data.find('tokenizers/punkt_tab')
 except LookupError:
-    nltk.download('punkt', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
 
 # Global tokenizer name to use consistently throughout the code
 TOKENIZER_NAME = "cl100k_base"
@@ -442,7 +442,30 @@ class Answer(BaseModel):
             for citation in citations:
                 if citation.get('id') not in valid_citations:
                     raise ValueError(f"Invalid citation: {citation.get('id')}. Must be one of: {valid_citations}")
+                # Ensure page field is a string and properly formatted
+                if 'page' in citation:
+                    if not isinstance(citation['page'], str):
+                        if isinstance(citation['page'], list):
+                            citation['page'] = f"Page {', '.join(map(str, citation['page']))}"
+                        else:
+                            citation['page'] = "Page 1"  # Default if not string or list
+                    elif not citation['page'].startswith('Page '):
+                        citation['page'] = f"Page {citation['page']}"
+                else:
+                    citation['page'] = "Page 1"  # Default if missing
         return citations
+
+def format_page_string(pages) -> str:
+    """Helper function to format page numbers consistently"""
+    if not pages:
+        return "Page 1"
+    if isinstance(pages, str):
+        if pages.startswith('Page '):
+            return pages
+        return f"Page {pages}"
+    if isinstance(pages, list):
+        return f"Page {', '.join(map(str, pages))}"
+    return "Page 1"
 
 def generate_answer(question: str, paragraphs: List[Dict[str, Any]],
                    scratchpad: str) -> Answer:
@@ -465,7 +488,7 @@ def generate_answer(question: str, paragraphs: List[Dict[str, Any]],
         context += f"PARAGRAPH {display_id}:\n{paragraph['text']}\n\n"
 
     valid_citations_str = ", ".join(valid_citations)
-    system_prompt = f"""You are an AI assistant helping with document analysis.\n\nAnswer the question using ONLY the provided paragraphs. Do not use external knowledge.\n\nFormat your response in markdown with the following sections:\n## Answer\n(Your answer here, do NOT include citations or references in this section.)\n\n## Citations\n- For each citation, use a bullet point in this format:\n  - [Section Name] (ID: <id>): \"Relevant excerpt from the paragraph\"\n\nExample:\n## Answer\nAOP stands for Annual Operating Plan. It is used for...\n\n## Citations\n- [AOP Definition] (ID: 2): \"AOP Annual Operating Plan revenue is typically defined at a monthly or period level...\"\n- [COGS Calculation] (ID: 3): \"COGS values are stored in the i n t e r i m w s s i a o p d a t a table...\"\n"""
+    system_prompt = f"""You are an AI assistant helping with document analysis.\n\nAnswer the question using ONLY the provided paragraphs. Do not use external knowledge.\n\nFormat your response in markdown with the following sections:\n## Answer\n(Your answer here, do NOT include citations or references in this section.)\n\n## Citations\n- For each citation, use a bullet point in this format:\n  - [Section Name] (ID: <id>): \"Relevant excerpt from the paragraph\" (Page: <page_numbers>)\n\nExample:\n## Answer\nAOP stands for Annual Operating Plan. It is used for...\n\n## Citations\n- [AOP Definition] (ID: 2): \"AOP Annual Operating Plan revenue is typically defined at a monthly or period level...\" (Page: 1, 2)\n- [COGS Calculation] (ID: 3): \"COGS values are stored in the i n t e r i m w s s i a o p d a t a table...\" (Page: 3)\n\nIMPORTANT: Always include page numbers in your citations. If you don't know the exact page numbers, use the page numbers from the paragraph's metadata."""
 
     try:
         response = client_nano.chat.completions.create(
@@ -493,26 +516,39 @@ def generate_answer(question: str, paragraphs: List[Dict[str, Any]],
             line = line.strip()
             if not line.startswith("-"):
                 continue
-            m = re.match(r"- \[(.*?)\] \(ID: (.*?)\): \"([\s\S]*?)\"", line)
+            # Updated regex to capture page numbers
+            m = re.match(r"- \[(.*?)\] \(ID: (.*?)\): \"([\s\S]*?)\" \(Page: (.*?)\)", line)
             if m:
-                section, cid, text = m.groups()
+                section, cid, text, pages = m.groups()
                 citations.append({
                     "id": cid,
                     "section": section,
-                    "text": text
+                    "text": text,
+                    "page": format_page_string(pages)
                 })
+            else:
+                # Fallback to old format if page numbers are missing
+                m = re.match(r"- \[(.*?)\] \(ID: (.*?)\): \"([\s\S]*?)\"", line)
+                if m:
+                    section, cid, text = m.groups()
+                    citations.append({
+                        "id": cid,
+                        "section": section,
+                        "text": text,
+                        "page": "Page 1"  # Default page number
+                    })
         
         # If no citations were parsed from the LLM response, create them from paragraphs
         if not citations:
             for p in paragraphs:
                 display_id = p.get("display_id", str(p["id"]))
                 pages = p.get("pages", [])
-                if pages:
-                    citations.append({
-                        "id": display_id,
-                        "section": f"Section {display_id}",
-                        "text": f"Page {', '.join(map(str, pages))}"
-                    })
+                citations.append({
+                    "id": display_id,
+                    "section": f"Section {display_id}",
+                    "text": p.get("text", ""),
+                    "page": format_page_string(pages)
+                })
 
         print("\n[LOG] Parsed citations array:")
         for c in citations:
@@ -529,12 +565,12 @@ def generate_answer(question: str, paragraphs: List[Dict[str, Any]],
         for p in paragraphs:
             display_id = p.get("display_id", str(p["id"]))
             pages = p.get("pages", [])
-            if pages:
-                citations.append({
-                    "id": display_id,
-                    "section": f"Section {display_id}",
-                    "text": f"Page {', '.join(map(str, pages))}"
-                })
+            citations.append({
+                "id": display_id,
+                "section": f"Section {display_id}",
+                "text": p.get("text", ""),
+                "page": format_page_string(pages)
+            })
         answer = Answer(
             answer="Error generating answer. Please try again.",
             citations=citations,

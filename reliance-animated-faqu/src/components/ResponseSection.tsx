@@ -7,8 +7,6 @@ import { useTheme } from "@/hooks/useTheme";
 import { marked } from 'marked';
 import { aiFormatter } from '@/utils/aiFormatter';
 import { BACKEND_URL } from "@/config";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy as faCopyRegular } from '@fortawesome/free-regular-svg-icons';
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import { createRoot } from 'react-dom/client';
@@ -241,8 +239,11 @@ interface ResponseCardProps {
 }
 
 // Helper to get unique page numbers from a string like "Page 1, 2, 3" or "Page 1-3"
-function getUniquePages(pageStr: string): number[] {
+function getUniquePages(pageStr: string | number[]): number[] {
   if (!pageStr) return [];
+  if (Array.isArray(pageStr)) {
+    return Array.from(new Set(pageStr.map(p => Number(p)).filter(n => !isNaN(n))));
+  }
   // Remove 'Page' or 'Pages', then split on commas or dashes
   pageStr = pageStr.replace(/Page(s)?/i, '').replace(/-/g, ',');
   return Array.from(
@@ -261,13 +262,13 @@ function renderUniquePageLinks(pageStr: string) {
   return uniquePages.map((page, idx) => (
     <a
       key={page + idx}
-      href={`${BACKEND_URL}/pdf/source.pdf#page=${page}`}
+      href={`${BACKEND_URL}/pdf/reliance/reliance_faq.pdf#page=${page}`}
       target="_blank"
       rel="noopener noreferrer"
       className="text-blue-500 hover:text-blue-700 underline mx-1"
       aria-label={`Open PDF at page ${page}`}
     >
-      Page {page}
+      {page}
     </a>
   ));
 }
@@ -280,7 +281,7 @@ function renderPageLinksLine(pages: Set<string>) {
       {sortedPages.map((page, idx) => (
         <span key={page}>
           <a
-            href={`${BACKEND_URL}/pdf/source.pdf#page=${page}`}
+            href={`${BACKEND_URL}/pdf/reliance/reliance_faq.pdf#page=${page}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-500 hover:text-blue-700 underline"
@@ -369,6 +370,123 @@ const ShowMoreLess: React.FC<{ text: string; maxLength?: number }> = ({ text, ma
   );
 };
 
+// Add this new component before the ResponseCard component
+interface TokenUsageProps {
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  cost: {
+    input_cost: number;
+    output_cost: number;
+    total_cost: number;
+  };
+  model: string;
+}
+
+const TokenUsageSection: React.FC<TokenUsageProps> = ({ usage, cost, model }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Model pricing information
+  const modelPricing = {
+    'ai-4.1-mini': {
+      input: 0.00015,
+      output: 0.0006,
+      name: 'AI-4.1 Mini'
+    },
+    'ai-4.1-nano': {
+      input: 0.0001,
+      output: 0.0004,
+      name: 'AI-4.1 Nano'
+    }
+  };
+
+  const currentModel = modelPricing[model as keyof typeof modelPricing] || modelPricing['ai-4.1-mini'];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, ease: "easeOut" }}
+      className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+    >
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <div className="flex items-center justify-between mb-3">
+          <p className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Usage Details</p>
+          <CollapsibleTrigger asChild>
+            <button
+              className={`p-1 rounded-full transition-all duration-300 ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? 'transform rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+              />
+            </button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent>
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.5, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-4 items-start">
+              <div className="flex flex-col items-start md:items-center w-full">
+                <p className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Token Usage</p>
+                <div className={`text-sm space-y-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                  style={{ minWidth: 160 }}>
+                  <motion.p initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2, duration: 0.6, ease: "easeOut" }}>
+                    Prompt Tokens: {usage.prompt_tokens.toLocaleString()}
+                  </motion.p>
+                  <motion.p initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.4, duration: 0.6, ease: "easeOut" }}>
+                    Completion Tokens: {usage.completion_tokens.toLocaleString()}
+                  </motion.p>
+                  <motion.p initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.6, duration: 0.6, ease: "easeOut" }} className="font-medium">
+                    Total Tokens: {usage.total_tokens.toLocaleString()}
+                  </motion.p>
+                </div>
+              </div>
+              <div className="flex flex-col items-start md:items-center w-full">
+                <p className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Cost (USD)</p>
+                <div className={`text-sm space-y-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                  style={{ minWidth: 160 }}>
+                  <motion.p initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2, duration: 0.6, ease: "easeOut" }}>
+                    Input Cost: ${cost.input_cost.toFixed(3)}
+                  </motion.p>
+                  <motion.p initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.4, duration: 0.6, ease: "easeOut" }}>
+                    Output Cost: ${cost.output_cost.toFixed(3)}
+                  </motion.p>
+                  <motion.p initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.6, duration: 0.6, ease: "easeOut" }} className="font-medium">
+                    Total Cost: ${cost.total_cost.toFixed(3)}
+                  </motion.p>
+                </div>
+              </div>
+            </div>
+            {/* Model Pricing Information */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8, duration: 0.6, ease: "easeOut" }}
+              className={`mt-4 pt-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}
+            >
+              <p className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Model Pricing ({currentModel.name})</p>
+              <div className={`text-sm space-y-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                style={{ minWidth: 160 }}>
+                <p>Input: ${currentModel.input.toFixed(4)} per 1K tokens</p>
+                <p>Output: ${currentModel.output.toFixed(4)} per 1K tokens</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        </CollapsibleContent>
+      </Collapsible>
+    </motion.div>
+  );
+};
+
 const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -422,7 +540,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
+      transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
     >
       <Card 
         className={`backdrop-blur-xl border ${isDark ? 'border-white/20' : 'border-black/10'} shadow-2xl ${isDark ? 'text-white' : 'text-zinc-800'} overflow-hidden`}
@@ -468,12 +586,13 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
             {/* Reasoning Section */}
             {hasReasoning && (
               <CollapsibleSection title="Reasoning" bgColorClass="bg-purple-900/60">
-                <div 
+                <div
                   className={`rounded-lg border ${isDark ? 'border-purple-800' : 'border-purple-300'} p-4 shadow-sm`}
                   style={sectionBackgroundStyle}
                 >
-                  <div 
-                    className={`text-base whitespace-pre-line ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                  <div
+                    className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                    style={{ fontFamily: 'inherit', fontSize: '1rem', lineHeight: '1.7' }}
                     dangerouslySetInnerHTML={{ __html: processReasoning(data.reasoning) }}
                   />
                 </div>
@@ -511,6 +630,15 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data }) => {
               <div className={`text-sm mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'} italic text-right`}>
                 {statusMessage}
               </div>
+            )}
+
+            {/* Token Usage and Cost Section */}
+            {data.usage && data.cost && (
+              <TokenUsageSection
+                usage={data.usage}
+                cost={data.cost}
+                model={data.model || 'ai-4.1-mini'}
+              />
             )}
           </div>
         </CardContent>

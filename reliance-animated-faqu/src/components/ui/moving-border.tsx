@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   motion,
   useAnimationFrame,
@@ -7,7 +7,6 @@ import {
   useMotionValue,
   useTransform,
 } from "motion/react";
-import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export function Button({
@@ -71,69 +70,95 @@ export function Button({
 
 export const MovingBorder = ({
   children,
-  duration = 3000,
-  rx,
-  ry,
+  duration = 8000,
+  rx = 16,
+  ry = 16,
   ...otherProps
 }: {
   children: React.ReactNode;
   duration?: number;
-  rx?: string;
-  ry?: string;
+  rx?: number;
+  ry?: number;
   [key: string]: any;
 }) => {
-  const pathRef = useRef<any>();
-  const progress = useMotionValue<number>(0);
+  const pathRef = useRef<SVGRectElement>(null);
+  const progress = useMotionValue(0);
+
+  useEffect(() => {
+    if (pathRef.current) {
+      const length = pathRef.current.getTotalLength();
+      progress.set(0);
+    }
+  }, []);
 
   useAnimationFrame((time) => {
-    const length = pathRef.current?.getTotalLength();
-    if (length) {
+    if (pathRef.current) {
+      const length = pathRef.current.getTotalLength();
       const pxPerMillisecond = length / duration;
-      progress.set((time * pxPerMillisecond) % length);
+      progress.set((time * 0.5 * pxPerMillisecond) % length); // Reduced speed by multiplying by 0.5
     }
   });
 
   const x = useTransform(
     progress,
-    (val) => pathRef.current?.getPointAtLength(val).x,
+    (val) => pathRef.current?.getPointAtLength(val).x ?? 0
   );
   const y = useTransform(
     progress,
-    (val) => pathRef.current?.getPointAtLength(val).y,
+    (val) => pathRef.current?.getPointAtLength(val).y ?? 0
   );
 
-  const transform = useMotionTemplate`translateX(${x}px) translateY(${y}px) translateX(-50%) translateY(-50%)`;
-
   return (
-    <>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="none"
-        className="absolute h-full w-full"
-        width="100%"
-        height="100%"
-        {...otherProps}
-      >
-        <rect
-          fill="none"
-          width="100%"
-          height="100%"
-          rx={rx}
-          ry={ry}
-          ref={pathRef}
-        />
-      </svg>
+    <div
+      className={cn(
+        "relative flex items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-950 p-3 md:p-4",
+        otherProps.className
+      )}
+    >
+      <div className="relative z-10">{children}</div>
       <motion.div
+        className="absolute inset-0"
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          display: "inline-block",
-          transform,
+          x,
+          y,
         }}
       >
-        {children}
+        <svg
+          width="100%"
+          height="100%"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+          }}
+        >
+          <rect
+            ref={pathRef}
+            width="100%"
+            height="100%"
+            rx={rx}
+            ry={ry}
+            fill="none"
+            stroke="url(#gradient)"
+            strokeWidth="2"
+            strokeDasharray={0}
+            pathLength={1}
+          />
+          <defs>
+            <linearGradient
+              id="gradient"
+              gradientUnits="userSpaceOnUse"
+              x1="0"
+              y1="0"
+              x2="100%"
+              y2="0"
+            >
+              <stop stopColor="rgba(255,255,255,0.6)" />
+              <stop offset="1" stopColor="rgba(255,255,255,0)" />
+            </linearGradient>
+          </defs>
+        </svg>
       </motion.div>
-    </>
+    </div>
   );
 };

@@ -203,7 +203,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ onQuestionSubmit }) => {
         )}
       </InputContainer>
 
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {mode === 'response' && (
           <ResponseContainer
             initial={{ height: 0, opacity: 0 }}

@@ -45,11 +45,11 @@ class PDFManager:
             raise
             
     def get_pdf(self, filename: str) -> Optional[Dict]:
-        """Get a PDF from the cache by filename."""
+        self.logger.info(f"get_pdf called with filename: {filename}. Current cache keys: {list(self.pdf_cache.keys())}")
         return self.pdf_cache.get(filename)
         
     def get_pdf_by_category(self, category: str) -> Dict[str, Dict]:
-        """Get all PDFs for a specific category."""
+        self.logger.info(f"get_pdf_by_category called with category: {category}. Current cache: {[(name, pdf['category']) for name, pdf in self.pdf_cache.items()]}")
         return {name: pdf for name, pdf in self.pdf_cache.items() 
                 if pdf['category'] == category}
                 
