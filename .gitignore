@@ -171,3 +171,9 @@ bun.lockb
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+
+# Sensitive files
+.env.backup
+cred.toml
+**/credentials.py
+**/test_credentials.py

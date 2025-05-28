@@ -137,4 +137,11 @@ Logs are stored in the `logs` directory with daily rotation. Each log file inclu
 
 ## License
 
-This project is proprietary and confidential. 
+This project is proprietary and confidential.
+
+## Cost Calculation & Transparency
+
+- The backend calculates the true cost for every AI model used in a response (e.g., mini, main, nano) using the latest rates from config/config.json.
+- The API response includes a costs array, with a breakdown for each model (model name, input/output/total tokens, and costs).
+- The frontend aggregates and displays the total cost incurred for the response, as well as a detailed breakdown per model.
+- Model pricing is always fetched from the backend and is kept up-to-date for full transparency. 

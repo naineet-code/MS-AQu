@@ -1,13 +1,11 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from config.logging_config import setup_logging, get_logger
 from config.settings import Settings
-from core.pdf_manager import PDFManager
+from config.credentials import get_azure_config
+from core.instances import pdf_manager  # Import shared instance
 from api.routes import router as api_router
 import uvicorn
 import psutil
@@ -15,19 +13,35 @@ import platform
 import datetime
 import os
 from pathlib import Path
+import requests
+from pypdf import PdfReader
+from nltk.tokenize import sent_tokenize
+import tiktoken
+from io import BytesIO
+from uuid import uuid4
+from openai import AzureOpenAI
+from pydantic import BaseModel
+import nltk
+from typing import Optional
 
 # Initialize logging
 setup_logging()
 logger = get_logger(__name__)
 
+# NLTK Punkt download
+try:
+    nltk.data.find('tokenizers/punkt')
+except nltk.downloader.DownloadError:
+    logger.info("NLTK 'punkt' tokenizer not found. Downloading...")
+    nltk.download('punkt')
+    logger.info("'punkt' tokenizer downloaded.")
+except Exception as e: # Catch other potential exceptions during NLTK setup
+    logger.error(f"An error occurred during NLTK setup: {e}")
+
 # Initialize settings
 settings = Settings()
 if not settings.validate():
     raise RuntimeError("Invalid configuration")
-
-# Initialize PDF manager
-pdf_manager = PDFManager(settings.get("PDF_DIR"))
-pdf_manager.load_pdfs()
 
 # Create FastAPI app
 app = FastAPI(
@@ -57,7 +71,7 @@ app.add_middleware(
 )
 
 # Include API routes
-app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -187,50 +201,23 @@ async def status_page():
                             <span class="text-gray-800 dark:text-white">{system_info['process_info']['cpu_percent']}%</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-600 dark:text-gray-300">Process Memory:</span>
+                            <span class="text-gray-600 dark:text-gray-300">Memory Usage:</span>
                             <span class="text-gray-800 dark:text-white">{system_info['process_info']['memory_info']['rss'] / 1024 / 1024:.2f} MB</span>
                         </div>
                     </div>
                 </div>
-
-                <!-- API Status -->
-                <div class="status-card rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">API Status</h2>
-                    <div class="space-y-3">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600 dark:text-gray-300">Status:</span>
-                            <span class="text-green-500 font-semibold">Operational</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600 dark:text-gray-300">Version:</span>
-                            <span class="text-gray-800 dark:text-white">1.0.0</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600 dark:text-gray-300">API Docs:</span>
-                            <a href="/docs" class="text-blue-500 hover:text-blue-600">Swagger UI</a>
-                        </div>
-                    </div>
-                </div>
             </div>
-
-            <footer class="mt-12 text-center text-gray-600 dark:text-gray-400">
-                <p>Last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-            </footer>
         </div>
     </body>
     </html>
     """
-    return html_content
+    return HTMLResponse(content=html_content)
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown."""
-    pdf_manager.close_all()
+    # Add any cleanup code here
+    pass
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "app:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    ) 
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True) 

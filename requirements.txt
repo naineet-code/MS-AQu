@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+openai
+tiktoken
+pypdf
+nltk
+requests 

@@ -111,15 +111,9 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
     
     // Fetch answer from backend
     try {
-      const data = await onSubmitQuestion(message);
-      // Add bot response to chat history
-      if (data && data.answer) {
-        onAddMessage(data.answer, false);
-      } else if (data && data.error) {
-        onAddMessage(data.error, false);
-      } else {
-        onAddMessage('No response from server.', false);
-      }
+      await onSubmitQuestion(message);
+      // The onSubmitQuestion function handles adding the response to chat history
+      // No need to add it here again
     } catch (err: any) {
       console.error(err);
       onAddMessage(err?.message || 'Error contacting server', false);

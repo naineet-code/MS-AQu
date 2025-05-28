@@ -43,16 +43,6 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close asChild>
-        <Button
-          size="icon"
-          variant="outline"
-          className="absolute right-4 top-4 h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </Button>
-      </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
 ))

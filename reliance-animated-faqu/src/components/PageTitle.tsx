@@ -1,7 +1,7 @@
-
 import React from "react";
 // import { useTheme } from "@/hooks/useTheme"; (no longer needed for 'u' styling)
 import { motion } from "motion/react";
+import { HelpCircle } from "lucide-react";
 
 interface PageTitleProps {
   isVisible: boolean;
@@ -11,27 +11,26 @@ const PageTitle: React.FC<PageTitleProps> = ({ isVisible }) => {
   if (!isVisible) return null;
 
   return (
-    <motion.div 
-      className="text-center mb-10"
-      initial={{ opacity: 1, height: "auto" }}
-      animate={{ opacity: 1, height: "auto" }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
+    <motion.div
+      className="relative text-center mb-10"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 24 }}
+      transition={{ duration: 0.7, ease: "easeOut" }}
     >
-      <h1 className="text-5xl md:text-7xl font-bold">
-        {/* Main FAQ heading with white 'u' */}
-        <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/90 drop-shadow-2xl align-baseline">
-          FAQ
-        </span>
-        <span className="text-white text-lg md:text-xl align-baseline">
-          u
-        </span>
-        {/* Subheading */}
-        {/* Subheading */}
-        <span className="bg-clip-text text-transparent bg-gradient-to-r from-white/70 to-white/50 text-sm md:text-lg ml-3 align-baseline drop-shadow-lg">
-          for Reliance
-        </span>
-      </h1>
+      <div className="flex flex-row justify-center items-stretch gap-2 relative w-full">
+        <div className="flex flex-col justify-start">
+          <sup className="text-xs md:text-sm text-gray-400 font-medium mr-2 mt-1">Increff</sup>
+        </div>
+        <div className="flex flex-col justify-center">
+          <h1 className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/90 drop-shadow-2xl">
+            FAQ
+          </h1>
+        </div>
+        <div className="flex flex-col justify-end">
+          <span className="text-xs md:text-base text-gray-400 font-medium ml-2">for Reliance</span>
+        </div>
+      </div>
     </motion.div>
   );
 };
