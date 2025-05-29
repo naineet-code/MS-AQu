@@ -146,7 +146,7 @@ const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md'; variant?: 'ghost'
   );
 };
 
-// Enhanced Section Header Component
+// Enhanced Section Header Component with improved hover animations
 const SectionHeader: React.FC<{
   title: string;
   icon: React.ReactNode;
@@ -155,40 +155,86 @@ const SectionHeader: React.FC<{
   copyText?: string;
   level?: 'primary' | 'secondary';
   description?: string;
-}> = ({ title, icon, isExpanded, onToggle, copyText, level = 'primary', description }) => {
+  hasContent?: boolean;
+}> = ({ title, icon, isExpanded, onToggle, copyText, level = 'primary', description, hasContent = true }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const [isHovered, setIsHovered] = useState(false);
 
   const levelStyles = {
     primary: {
-      container: `p-4 rounded-xl backdrop-blur-xl border ${
-        isDark 
-          ? 'bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-white/20' 
-          : 'bg-gradient-to-r from-blue-50/80 to-purple-50/80 border-black/10'
+      container: `relative overflow-hidden transition-all duration-300 ease-in-out ${
+        isHovered 
+          ? `p-4 rounded-xl backdrop-blur-xl border ${
+              isDark 
+                ? 'bg-gradient-to-r from-blue-900/40 to-purple-900/40 border-white/30 shadow-lg' 
+                : 'bg-gradient-to-r from-blue-50/90 to-purple-50/90 border-black/15 shadow-md'
+            }`
+          : `p-3 rounded-lg backdrop-blur-md border ${
+              isDark 
+                ? 'bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-white/10' 
+                : 'bg-gradient-to-r from-blue-50/60 to-purple-50/60 border-black/5'
+            }`
       }`,
-      title: `text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`,
-      icon: `h-6 w-6 ${isDark ? 'text-blue-300' : 'text-blue-600'}`
+      title: `transition-all duration-300 font-bold ${
+        isHovered ? 'text-xl' : 'text-lg'
+      } ${isDark ? 'text-white' : 'text-gray-900'}`,
+      icon: `transition-all duration-300 ${
+        isHovered ? 'h-6 w-6' : 'h-5 w-5'
+      } ${isDark ? 'text-blue-300' : 'text-blue-600'}`
     },
     secondary: {
-      container: `p-3 rounded-lg backdrop-blur-md border ${
-        isDark 
-          ? 'bg-gray-800/40 border-white/10' 
-          : 'bg-white/40 border-black/5'
+      container: `relative overflow-hidden transition-all duration-300 ease-in-out ${
+        isHovered 
+          ? `p-3 rounded-lg backdrop-blur-md border ${
+              isDark 
+                ? 'bg-gray-800/50 border-white/15 shadow-md' 
+                : 'bg-white/50 border-black/8 shadow-sm'
+            }`
+          : `p-2 rounded-md backdrop-blur-sm border ${
+              isDark 
+                ? 'bg-gray-800/30 border-white/5' 
+                : 'bg-white/30 border-black/3'
+            }`
       }`,
-      title: `text-lg font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`,
-      icon: `h-5 w-5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`
+      title: `transition-all duration-300 font-semibold ${
+        isHovered ? 'text-lg' : 'text-base'
+      } ${isDark ? 'text-gray-200' : 'text-gray-800'}`,
+      icon: `transition-all duration-300 ${
+        isHovered ? 'h-5 w-5' : 'h-4 w-4'
+      } ${isDark ? 'text-gray-400' : 'text-gray-600'}`
     }
   };
 
   const styles = levelStyles[level];
 
+  // Show content preview when collapsed and hovered
+  const showPreview = !isExpanded && hasContent && level === 'secondary' && isHovered;
+
   return (
     <motion.div
       className={styles.container}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
       whileHover={{ scale: 1.01 }}
       transition={{ duration: 0.2 }}
     >
-      <div className="flex items-center justify-between">
+      {/* Animated background gradient for hover effect */}
+      <motion.div
+        className={`absolute inset-0 rounded-lg ${
+          isDark 
+            ? 'bg-gradient-to-r from-blue-600/10 to-purple-600/10' 
+            : 'bg-gradient-to-r from-blue-400/10 to-purple-400/10'
+        }`}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ 
+          opacity: isHovered ? 1 : 0,
+          scale: isHovered ? 1 : 0.8
+        }}
+        transition={{ duration: 0.3 }}
+      />
+      
+      <div className="relative z-10 flex items-center justify-between">
         <motion.button
           onClick={onToggle}
           className="flex items-center gap-3 flex-1 text-left focus:outline-none"
@@ -198,12 +244,30 @@ const SectionHeader: React.FC<{
           <div className={styles.icon}>
             {icon}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <h3 className={styles.title}>{title}</h3>
-            {description && (
-              <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            {description && (isHovered || level === 'primary') && (
+              <motion.p 
+                className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+              >
                 {description}
-              </p>
+              </motion.p>
+            )}
+            {showPreview && (
+              <motion.div
+                className={`text-xs mt-2 px-2 py-1 rounded ${
+                  isDark ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100/50 text-gray-600'
+                }`}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                transition={{ duration: 0.3 }}
+              >
+                Click to expand {title.toLowerCase()}
+              </motion.div>
             )}
           </div>
           <motion.div
@@ -216,9 +280,13 @@ const SectionHeader: React.FC<{
         </motion.button>
         
         {copyText && (
-          <div className="ml-3">
+          <motion.div 
+            className="ml-3"
+            animate={{ scale: isHovered ? 1.1 : 1 }}
+            transition={{ duration: 0.2 }}
+          >
             <CopyButton text={copyText} size="md" variant="secondary" />
-          </div>
+          </motion.div>
         )}
       </div>
     </motion.div>
@@ -291,16 +359,18 @@ const RichTextRenderer: React.FC<{ content: string; backendUrl?: string | null }
     if (backendUrl) {
       try {
         // Comprehensive regex to catch any page references in various formats
-        // This will match patterns like: "page 3", "pages 18-19", "on page 5", "(page 7)", etc.
-        processed = processed.replace(/\b(?:on\s+)?(?:page|pages|Page|Pages)\s+(\d{1,4}(?:-\d{1,4})?(?:,\s*\d{1,4}(?:-\d{1,4})?)*)\b(?![^<]*?>)/gi, (match, pageNumbers) => {
+        // This will match patterns like: "page 3", "pages 18-19", "pages 6–11", "on page 5", "(page 7)", etc.
+        // Updated to handle both regular hyphens (-) and en-dashes (–)
+        processed = processed.replace(/\b(?:on\s+)?(?:page|pages|Page|Pages)\s+(\d{1,4}(?:[-–]\d{1,4})?(?:,\s*\d{1,4}(?:[-–]\d{1,4})?)*)\b(?![^<]*?>)/gi, (match, pageNumbers) => {
           // Extract the prefix (everything before the page numbers)
           const prefix = match.replace(pageNumbers, '').trim();
           // Split page numbers by comma
           const pages = pageNumbers.split(/,\s*/).filter(p => p.trim());
           const pageLinks = pages.map(pageRange => {
             const cleanPage = pageRange.trim();
-            if (/^\d{1,4}-\d{1,4}$/.test(cleanPage)) {
-              const [start] = cleanPage.split('-');
+            // Updated regex to handle both hyphens and en-dashes
+            if (/^\d{1,4}[-–]\d{1,4}$/.test(cleanPage)) {
+              const [start] = cleanPage.split(/[-–]/);
               return `<a href="${backendUrl}/pdf/reliance/reliance_faq.pdf#page=${start}" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline transition-colors">${cleanPage}</a>`;
             }
             if (/^\d{1,4}$/.test(cleanPage)) {
@@ -311,13 +381,15 @@ const RichTextRenderer: React.FC<{ content: string; backendUrl?: string | null }
           return `${prefix} ${pageLinks}`;
         });
 
-        // Handle page references in parentheses like "(page 3)" or "(pages 18-19)"
-        processed = processed.replace(/\((?:page|pages)\s+(\d{1,4}(?:-\d{1,4})?(?:,\s*\d{1,4}(?:-\d{1,4})?)*)\)/gi, (match, pageNumbers) => {
+        // Handle page references in parentheses like "(page 3)" or "(pages 18-19)" or "(pages 6–11)"
+        // Updated to handle both regular hyphens (-) and en-dashes (–)
+        processed = processed.replace(/\((?:page|pages)\s+(\d{1,4}(?:[-–]\d{1,4})?(?:,\s*\d{1,4}(?:[-–]\d{1,4})?)*)\)/gi, (match, pageNumbers) => {
           const pages = pageNumbers.split(/,\s*/).filter(p => p.trim());
           const pageLinks = pages.map(pageRange => {
             const cleanPage = pageRange.trim();
-            if (/^\d{1,4}-\d{1,4}$/.test(cleanPage)) {
-              const [start] = cleanPage.split('-');
+            // Updated regex to handle both hyphens and en-dashes
+            if (/^\d{1,4}[-–]\d{1,4}$/.test(cleanPage)) {
+              const [start] = cleanPage.split(/[-–]/);
               return `<a href="${backendUrl}/pdf/reliance/reliance_faq.pdf#page=${start}" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600 underline transition-colors">${cleanPage}</a>`;
             }
             if (/^\d{1,4}$/.test(cleanPage)) {
@@ -325,7 +397,7 @@ const RichTextRenderer: React.FC<{ content: string; backendUrl?: string | null }
             }
             return cleanPage;
           }).join(', ');
-          const isPlural = pages.length > 1 || pages.some(p => p.includes('-'));
+          const isPlural = pages.length > 1 || pages.some(p => p.includes('-') || p.includes('–'));
           return `(page${isPlural ? 's' : ''} ${pageLinks})`;
         });
 
@@ -450,10 +522,12 @@ const ExpandableText: React.FC<{ text: string; maxLength?: number }> = ({ text, 
 const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  
+  // Updated initial state to show more sections expanded/visible by default
   const [expandedSections, setExpandedSections] = useState({
     answer: true,
     reasoning: false,
-    verification: false,
+    verification: false, 
     citations: false,
     costs: false
   });
@@ -555,252 +629,273 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
 
   return (
     <Card className={`w-full ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-      <CardContent className="p-6 space-y-6 max-h-[calc(90vh-12rem)] overflow-y-auto">
-        {/* Answer Section */}
-        <Collapsible
-          open={expandedSections.answer}
-          onOpenChange={() => toggleSection('answer')}
+      <CardContent className="p-2 space-y-3">
+        {/* Enhanced scrollable container with better styling */}
+        <div 
+          className={`max-h-[calc(85vh-8rem)] overflow-y-auto space-y-3 px-4 py-2 ${
+            isDark 
+              ? 'scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500' 
+              : 'scrollbar-thin scrollbar-track-gray-200 scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-500'
+          }`}
+          style={{
+            scrollBehavior: 'smooth'
+          }}
         >
-          <SectionHeader
-            title="Answer"
-            icon={<Brain className="h-5 w-5" />}
-            isExpanded={expandedSections.answer}
-            onToggle={() => toggleSection('answer')}
-            copyText={data.answer}
-            level="primary"
-            description={`Generated using ${getModelInfo('answer')}`}
-          />
-          <CollapsibleContent>
-            <ContentContainer>
-              <RichTextRenderer content={data.answer} backendUrl={backendUrl} />
-            </ContentContainer>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Reasoning Section - only show if reasoning exists */}
-        {data.reasoning && (
+          {/* Answer Section - Always shown and expanded */}
           <Collapsible
-            open={expandedSections.reasoning}
-            onOpenChange={() => toggleSection('reasoning')}
+            open={expandedSections.answer}
+            onOpenChange={() => toggleSection('answer')}
           >
             <SectionHeader
-              title="Reasoning"
-              icon={<HelpCircle className="h-5 w-5" />}
-              isExpanded={expandedSections.reasoning}
-              onToggle={() => toggleSection('reasoning')}
-              copyText={data.reasoning}
-              level="secondary"
-              description={`Generated using ${getModelInfo('reasoning')}`}
+              title="Answer"
+              icon={<Brain className="h-5 w-5" />}
+              isExpanded={expandedSections.answer}
+              onToggle={() => toggleSection('answer')}
+              copyText={data.answer}
+              level="primary"
+              description={`Generated using ${getModelInfo('answer')}`}
+              hasContent={!!data.answer}
             />
             <CollapsibleContent>
-              <ContentContainer level="secondary">
-                <RichTextRenderer content={data.reasoning} backendUrl={backendUrl} />
+              <ContentContainer>
+                <RichTextRenderer content={data.answer} backendUrl={backendUrl} />
               </ContentContainer>
             </CollapsibleContent>
           </Collapsible>
-        )}
 
-        {/* Verification Section - only show if verification exists */}
-        {data.verification && (
-          <Collapsible
-            open={expandedSections.verification}
-            onOpenChange={() => toggleSection('verification')}
-          >
-            <SectionHeader
-              title="Verification"
-              icon={<Check className="h-5 w-5" />}
-              isExpanded={expandedSections.verification}
-              onToggle={() => toggleSection('verification')}
-              copyText={data.verification}
-              level="secondary"
-              description={`Generated using ${getModelInfo('verification')}`}
-            />
-            <CollapsibleContent>
-              <ContentContainer level="secondary">
-                <RichTextRenderer content={data.verification} backendUrl={backendUrl} />
-              </ContentContainer>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+          {/* Reasoning Section - Always shown with compact header */}
+          {data.reasoning && (
+            <Collapsible
+              open={expandedSections.reasoning}
+              onOpenChange={() => toggleSection('reasoning')}
+            >
+              <SectionHeader
+                title="Reasoning"
+                icon={<HelpCircle className="h-5 w-5" />}
+                isExpanded={expandedSections.reasoning}
+                onToggle={() => toggleSection('reasoning')}
+                copyText={data.reasoning}
+                level="secondary"
+                description={`Step-by-step thinking process • ${getModelInfo('reasoning')}`}
+                hasContent={!!data.reasoning}
+              />
+              <CollapsibleContent>
+                <ContentContainer level="secondary">
+                  <RichTextRenderer content={data.reasoning} backendUrl={backendUrl} />
+                </ContentContainer>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
-        {/* Citations Section - only show if citations exist */}
-        {citations.length > 0 && (
-          <Collapsible
-            open={expandedSections.citations}
-            onOpenChange={() => toggleSection('citations')}
-          >
-            <SectionHeader
-              title="Citations"
-              icon={<Quote className="h-5 w-5" />}
-              isExpanded={expandedSections.citations}
-              onToggle={() => toggleSection('citations')}
-              level="secondary"
-            />
-            <CollapsibleContent>
-              <ContentContainer level="secondary">
-                <div className="space-y-4">
-                  {citations.map((citation, index) => (
-                    <div
-                      key={index}
-                      className={`p-3 rounded-lg ${
-                        isDark ? 'bg-gray-800/50' : 'bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0">
-                          <BookOpen className={`h-5 w-5 ${
-                            isDark ? 'text-gray-400' : 'text-gray-500'
-                          }`} />
-                        </div>
-                        <div className="flex-1">
-                          <p className={`text-sm ${
-                            isDark ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
-                            {citation.text}
-                          </p>
-                          <div className={`text-xs mt-1 ${
-                            isDark ? 'text-gray-400' : 'text-gray-500'
-                          }`}>
-                            <CitationPageLink 
-                              pages={citation.page} 
-                              backendUrl={backendUrl} 
-                              isDark={isDark} 
-                            />
+          {/* Verification Section - Always shown with compact header */}
+          {data.verification && (
+            <Collapsible
+              open={expandedSections.verification}
+              onOpenChange={() => toggleSection('verification')}
+            >
+              <SectionHeader
+                title="Verification"
+                icon={<Check className="h-5 w-5" />}
+                isExpanded={expandedSections.verification}
+                onToggle={() => toggleSection('verification')}
+                copyText={data.verification}
+                level="secondary"
+                description={`Accuracy & fact checking • ${getModelInfo('verification')}`}
+                hasContent={!!data.verification}
+              />
+              <CollapsibleContent>
+                <ContentContainer level="secondary">
+                  <RichTextRenderer content={data.verification} backendUrl={backendUrl} />
+                </ContentContainer>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Citations Section - Always shown when citations exist */}
+          {citations.length > 0 && (
+            <Collapsible
+              open={expandedSections.citations}
+              onOpenChange={() => toggleSection('citations')}
+            >
+              <SectionHeader
+                title="Citations"
+                icon={<Quote className="h-5 w-5" />}
+                isExpanded={expandedSections.citations}
+                onToggle={() => toggleSection('citations')}
+                level="secondary"
+                description={`${citations.length} source${citations.length !== 1 ? 's' : ''} found`}
+                hasContent={citations.length > 0}
+              />
+              <CollapsibleContent>
+                <ContentContainer level="secondary">
+                  <div className="space-y-3">
+                    {citations.map((citation, index) => (
+                      <motion.div
+                        key={index}
+                        className={`p-3 rounded-lg border transition-all duration-200 hover:border-opacity-60 ${
+                          isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-200'
+                        }`}
+                        whileHover={{ scale: 1.01 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 mt-1">
+                            <BookOpen className={`h-4 w-4 ${
+                              isDark ? 'text-gray-400' : 'text-gray-500'
+                            }`} />
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ContentContainer>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {/* Costs Section - only show if costs exist */}
-        {costs.length > 0 && (
-          <Collapsible
-            open={expandedSections.costs}
-            onOpenChange={() => toggleSection('costs')}
-          >
-            <SectionHeader
-              title="Cost Breakdown"
-              icon={<DollarSign className="h-5 w-5" />}
-              isExpanded={expandedSections.costs}
-              onToggle={() => toggleSection('costs')}
-              level="secondary"
-            />
-            <CollapsibleContent>
-              <ContentContainer level="secondary">
-                <div className="space-y-4">
-                  {/* Calculate totals */}
-                  {(() => {
-                    const totalTokens = costs.reduce((sum, cost) => 
-                      sum + (cost.totalTokens || cost.total_tokens || 0), 0
-                    );
-                    const totalCost = costs.reduce((sum, cost) => 
-                      sum + (cost.totalCost || cost.total_cost || 0), 0
-                    );
-                    
-                    return (
-                      <>
-                        {/* Totals Summary */}
-                        <div
-                          className={`p-4 rounded-lg border-2 ${
-                            isDark 
-                              ? 'bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-blue-500/50' 
-                              : 'bg-gradient-to-r from-blue-50 to-purple-50 border-blue-300/50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <h4 className={`text-base font-semibold ${
-                              isDark ? 'text-gray-100' : 'text-gray-800'
+                          <div className="flex-1">
+                            <ExpandableText text={citation.text} maxLength={150} />
+                            <div className={`text-xs mt-2 ${
+                              isDark ? 'text-gray-400' : 'text-gray-500'
                             }`}>
-                              Total Usage & Cost
-                            </h4>
-                            <div className="text-right">
-                              <p className={`text-lg font-bold ${
-                                isDark ? 'text-green-400' : 'text-green-600'
-                              }`}>
-                                ${totalCost.toFixed(3)}
-                              </p>
-                              <p className={`text-sm ${
-                                isDark ? 'text-gray-300' : 'text-gray-600'
-                              }`}>
-                                {totalTokens.toLocaleString()} tokens
-                              </p>
+                              <CitationPageLink 
+                                pages={citation.page} 
+                                backendUrl={backendUrl} 
+                                isDark={isDark} 
+                              />
                             </div>
                           </div>
                         </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </ContentContainer>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
-                        {/* Individual Model Costs */}
-                        {costs.map((cost, index) => (
-                          <div
-                            key={index}
-                            className={`p-3 rounded-lg ${
-                              isDark ? 'bg-gray-800/50' : 'bg-gray-50'
+          {/* Costs Section - Always shown when costs exist */}
+          {costs.length > 0 && (
+            <Collapsible
+              open={expandedSections.costs}
+              onOpenChange={() => toggleSection('costs')}
+            >
+              <SectionHeader
+                title="Cost Breakdown"
+                icon={<DollarSign className="h-5 w-5" />}
+                isExpanded={expandedSections.costs}
+                onToggle={() => toggleSection('costs')}
+                level="secondary"
+                description={`Token usage & API costs for ${costs.length} model${costs.length !== 1 ? 's' : ''}`}
+                hasContent={costs.length > 0}
+              />
+              <CollapsibleContent>
+                <ContentContainer level="secondary">
+                  <div className="space-y-4">
+                    {/* Calculate totals */}
+                    {(() => {
+                      const totalTokens = costs.reduce((sum, cost) => 
+                        sum + (cost.totalTokens || cost.total_tokens || 0), 0
+                      );
+                      const totalCost = costs.reduce((sum, cost) => 
+                        sum + (cost.totalCost || cost.total_cost || 0), 0
+                      );
+                      
+                      return (
+                        <>
+                          {/* Totals Summary */}
+                          <motion.div
+                            className={`p-4 rounded-lg border-2 ${
+                              isDark 
+                                ? 'bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-blue-500/50' 
+                                : 'bg-gradient-to-r from-blue-50 to-purple-50 border-blue-300/50'
                             }`}
+                            whileHover={{ scale: 1.01 }}
+                            transition={{ duration: 0.2 }}
                           >
-                            <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0">
-                                <Brain className={`h-5 w-5 ${
-                                  isDark ? 'text-gray-400' : 'text-gray-500'
-                                }`} />
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`text-sm font-medium ${
-                                  isDark ? 'text-gray-200' : 'text-gray-800'
+                            <div className="flex items-center justify-between">
+                              <h4 className={`text-base font-semibold ${
+                                isDark ? 'text-gray-100' : 'text-gray-800'
+                              }`}>
+                                Total Usage & Cost
+                              </h4>
+                              <div className="text-right">
+                                <p className={`text-lg font-bold ${
+                                  isDark ? 'text-green-400' : 'text-green-600'
                                 }`}>
-                                  {cost.model}
-                                </h4>
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                  <div>
-                                    <p className={`text-xs ${
-                                      isDark ? 'text-gray-400' : 'text-gray-500'
-                                    }`}>
-                                      Input Tokens: {(cost.inputTokens || cost.input_tokens || 0).toLocaleString()}
-                                    </p>
-                                    <p className={`text-xs ${
-                                      isDark ? 'text-gray-400' : 'text-gray-500'
-                                    }`}>
-                                      Output Tokens: {(cost.outputTokens || cost.output_tokens || 0).toLocaleString()}
-                                    </p>
-                                    <p className={`text-xs ${
-                                      isDark ? 'text-gray-400' : 'text-gray-500'
-                                    }`}>
-                                      Total Tokens: {(cost.totalTokens || cost.total_tokens || 0).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className={`text-xs ${
-                                      isDark ? 'text-gray-400' : 'text-gray-500'
-                                    }`}>
-                                      Input Cost: ${(cost.inputCost || cost.input_cost || 0).toFixed(3)}
-                                    </p>
-                                    <p className={`text-xs ${
-                                      isDark ? 'text-gray-400' : 'text-gray-500'
-                                    }`}>
-                                      Output Cost: ${(cost.outputCost || cost.output_cost || 0).toFixed(3)}
-                                    </p>
-                                    <p className={`text-xs ${
-                                      isDark ? 'text-gray-400' : 'text-gray-500'
-                                    }`}>
-                                      Total Cost: ${(cost.totalCost || cost.total_cost || 0).toFixed(3)}
-                                    </p>
+                                  ${totalCost.toFixed(3)}
+                                </p>
+                                <p className={`text-sm ${
+                                  isDark ? 'text-gray-300' : 'text-gray-600'
+                                }`}>
+                                  {totalTokens.toLocaleString()} tokens
+                                </p>
+                              </div>
+                            </div>
+                          </motion.div>
+
+                          {/* Individual Model Costs */}
+                          {costs.map((cost, index) => (
+                            <motion.div
+                              key={index}
+                              className={`p-3 rounded-lg border transition-all duration-200 ${
+                                isDark ? 'bg-gray-800/50 border-gray-700 hover:border-gray-600' : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                              }`}
+                              whileHover={{ scale: 1.005 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0">
+                                  <Brain className={`h-5 w-5 ${
+                                    isDark ? 'text-gray-400' : 'text-gray-500'
+                                  }`} />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className={`text-sm font-medium ${
+                                    isDark ? 'text-gray-200' : 'text-gray-800'
+                                  }`}>
+                                    {cost.model}
+                                  </h4>
+                                  <div className="grid grid-cols-2 gap-2 mt-2">
+                                    <div>
+                                      <p className={`text-xs ${
+                                        isDark ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        Input Tokens: {(cost.inputTokens || cost.input_tokens || 0).toLocaleString()}
+                                      </p>
+                                      <p className={`text-xs ${
+                                        isDark ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        Output Tokens: {(cost.outputTokens || cost.output_tokens || 0).toLocaleString()}
+                                      </p>
+                                      <p className={`text-xs ${
+                                        isDark ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        Total Tokens: {(cost.totalTokens || cost.total_tokens || 0).toLocaleString()}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className={`text-xs ${
+                                        isDark ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        Input Cost: ${(cost.inputCost || cost.input_cost || 0).toFixed(3)}
+                                      </p>
+                                      <p className={`text-xs ${
+                                        isDark ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        Output Cost: ${(cost.outputCost || cost.output_cost || 0).toFixed(3)}
+                                      </p>
+                                      <p className={`text-xs ${
+                                        isDark ? 'text-gray-400' : 'text-gray-500'
+                                      }`}>
+                                        Total Cost: ${(cost.totalCost || cost.total_cost || 0).toFixed(3)}
+                                      </p>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                        ))}
-                      </>
-                    );
-                  })()}
-                </div>
-              </ContentContainer>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+                            </motion.div>
+                          ))}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </ContentContainer>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

@@ -527,7 +527,7 @@ def format_page_string(pages) -> str:
     if len(pages) == 1:
         return f"Page {pages[0]}"
     else:
-        return f"Pages {'-'.join(map(str, sorted(set(pages))))}"
+        return f"Pages {'–'.join(map(str, sorted(set(pages))))}"
 
 def generate_answer(question: str, paragraphs: List[Dict]) -> Answer:
     """

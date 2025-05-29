@@ -625,7 +625,7 @@ def format_page_string(pages) -> str:
             return pages
         return f"Page {pages}"
     if isinstance(pages, list):
-        return f"Page {', '.join(map(str, pages))}"
+        return f"Page {'–'.join(map(str, pages))}"
     return "Page 1"
 
 def generate_answer(question: str, paragraphs: List[Dict]) -> Answer:
