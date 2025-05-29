@@ -1,6 +1,5 @@
-
 import React from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Send, Sparkles, Zap, RotateCcw } from "lucide-react";
 

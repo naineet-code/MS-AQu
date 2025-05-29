@@ -6,8 +6,15 @@ import {
   useMotionTemplate,
   useMotionValue,
   useTransform,
-} from "motion/react";
+} from "framer-motion";
 import { cn } from "@/lib/utils";
+import {
+  motion as framerMotion,
+  useAnimationFrame as framerUseAnimationFrame,
+  useMotionTemplate as framerUseMotionTemplate,
+  useMotionValue as framerUseMotionValue,
+  useTransform as framerUseTransform,
+} from "framer-motion";
 
 export function Button({
   borderRadius = "1.75rem",

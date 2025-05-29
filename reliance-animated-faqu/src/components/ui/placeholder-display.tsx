@@ -1,6 +1,5 @@
-
 import React from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface PlaceholderDisplayProps {
   currentPlaceholder: number;

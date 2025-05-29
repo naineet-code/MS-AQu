@@ -7,16 +7,21 @@ import nltk
 import ssl
 from typing import List, Dict, Any, Tuple
 import os
-from dotenv import load_dotenv
 import time
 import concurrent.futures
 import json
 from openai import AzureOpenAI
 import requests
 from io import BytesIO
+import httpx
 
-# Load environment variables
-load_dotenv()
+# Configuration is now loaded from TOML via credentials manager
+
+# Import credentials manager
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+from config.credentials import get_azure_config
 
 # Download nltk data if not already present
 try:
@@ -34,105 +39,123 @@ except LookupError:
 # Global tokenizer name to use consistently throughout the code
 TOKENIZER_NAME = "cl100k_base"
 
+# Global client variables - will be initialized when needed
+client_mini = None
+client_nano = None
+deployment_mini = None
+deployment_nano = None
+
+def get_mini_client():
+    """Get or initialize the mini client."""
+    global client_mini, deployment_mini
+    if client_mini is None:
+        try:
+            config = get_azure_config('mini')
+            
+            client_mini = AzureOpenAI(
+                api_key=config['api_key'],
+                api_version=config['api_version'],
+                azure_endpoint=config['endpoint'],
+                http_client=httpx.Client()
+            )
+            deployment_mini = config['deployment_name']
+            print(f"Mini client initialized successfully with deployment: {deployment_mini}")
+            
+        except Exception as e:
+            print(f"Error initializing mini client: {str(e)}")
+            raise ValueError(f"Failed to initialize Azure OpenAI Mini client: {str(e)}")
+    
+    return client_mini, deployment_mini
+
+def get_nano_client():
+    """Get or initialize the nano client."""
+    global client_nano, deployment_nano
+    if client_nano is None:
+        try:
+            config = get_azure_config('nano')
+            
+            client_nano = AzureOpenAI(
+                api_key=config['api_key'],
+                api_version=config['api_version'],
+                azure_endpoint=config['endpoint'],
+                http_client=httpx.Client()
+            )
+            deployment_nano = config['deployment_name']
+            print(f"Nano client initialized successfully with deployment: {deployment_nano}")
+            
+        except Exception as e:
+            print(f"Error initializing nano client: {str(e)}")
+            raise ValueError(f"Failed to initialize Azure OpenAI Nano client: {str(e)}")
+    
+    return client_nano, deployment_nano
+
 def split_into_50_chunks(text: str, min_tokens: int = 500) -> List[Dict[str, Any]]:
     """
-    Split text into up to 30 chunks, respecting sentence boundaries and ensuring
-    each chunk has at least min_tokens (unless it's the last chunk).
-
-    Args:
-        text: The text to split
-        min_tokens: The minimum number of tokens per chunk (default: 500)
-
-    Returns:
-        A list of dictionaries where each dictionary has:
-        - id: The chunk ID (0-29)
-        - text: The chunk text content
+    Split text into chunks of approximately min_tokens size, preserving page boundaries.
     """
-    # First, split the text into sentences
-    sentences = sent_tokenize(text)
+    try:
+        # Initialize tokenizer
+        tokenizer = tiktoken.get_encoding("cl100k_base")
+        
+        # Split text into sentences
+        sentences = sent_tokenize(text)
+        print(f"\nTotal sentences: {len(sentences)}")
+        print("First few sentences:")
+        for i, s in enumerate(sentences[:5]):
+            print(f"Sentence {i}: {s[:100]}...")
+        
+        chunks = []
+        current_chunk_sentences = []
+        current_chunk_tokens = 0
+        current_page = 1  # Default page number
+        
+        for sentence in sentences:
+            # Check if this sentence contains a page number marker
+            page_match = re.search(r'\[Page (\d+)\]', sentence)
+            if page_match:
+                current_page = int(page_match.group(1))
+                # Remove the page number marker from the sentence
+                sentence = re.sub(r'\[Page \d+\]\n', '', sentence)
 
-    # Get tokenizer for counting tokens
-    tokenizer = tiktoken.get_encoding(TOKENIZER_NAME)
+            # Count tokens in this sentence
+            sentence_tokens = len(tokenizer.encode(sentence))
 
-    # Create chunks that respect sentence boundaries and minimum token count
-    chunks = []
-    current_chunk_sentences = []
-    current_chunk_tokens = 0
+            # If adding this sentence would make the chunk too large AND we already have the minimum tokens,
+            # finalize the current chunk and start a new one
+            if (current_chunk_tokens + sentence_tokens > min_tokens * 2) and current_chunk_tokens >= min_tokens:
+                chunk_text = " ".join(current_chunk_sentences)
+                chunks.append({
+                    "id": len(chunks),  # Integer ID instead of string
+                    "text": chunk_text,
+                    "pages": [current_page]
+                })
+                print(f"\nCreated chunk {len(chunks)-1}:")
+                print(f"Pages: {current_page}")
+                print(f"Content: {chunk_text[:200]}...")
+                current_chunk_sentences = [sentence]
+                current_chunk_tokens = sentence_tokens
+            else:
+                # Add this sentence to the current chunk
+                current_chunk_sentences.append(sentence)
+                current_chunk_tokens += sentence_tokens
 
-    for sentence in sentences:
-        # Count tokens in this sentence
-        sentence_tokens = len(tokenizer.encode(sentence))
-
-        # If adding this sentence would make the chunk too large AND we already have the minimum tokens,
-        # finalize the current chunk and start a new one
-        if (current_chunk_tokens + sentence_tokens > min_tokens * 2) and current_chunk_tokens >= min_tokens:
+        # Add the last chunk if there's anything left
+        if current_chunk_sentences:
             chunk_text = " ".join(current_chunk_sentences)
             chunks.append({
                 "id": len(chunks),  # Integer ID instead of string
-                "text": chunk_text
+                "text": chunk_text,
+                "pages": [current_page]
             })
-            current_chunk_sentences = [sentence]
-            current_chunk_tokens = sentence_tokens
-        else:
-            # Add this sentence to the current chunk
-            current_chunk_sentences.append(sentence)
-            current_chunk_tokens += sentence_tokens
+            print(f"\nCreated final chunk {len(chunks)-1}:")
+            print(f"Pages: {current_page}")
+            print(f"Content: {chunk_text[:200]}...")
 
-    # Add the last chunk if there's anything left
-    if current_chunk_sentences:
-        chunk_text = " ".join(current_chunk_sentences)
-        chunks.append({
-            "id": len(chunks),  # Integer ID instead of string
-            "text": chunk_text
-        })
-
-    # If we have more than 30 chunks, consolidate them
-    if len(chunks) > 30:
-        # Recombine all text
-        all_text = " ".join(chunk["text"] for chunk in chunks)
-        # Re-split into exactly 30 chunks, without minimum token requirement
-        sentences = sent_tokenize(all_text)
-        sentences_per_chunk = len(sentences) // 30 + (1 if len(sentences) % 30 > 0 else 0)
-
-        chunks = []
-        for i in range(0, len(sentences), sentences_per_chunk):
-            # Get the sentences for this chunk
-            chunk_sentences = sentences[i:i+sentences_per_chunk]
-            # Join the sentences into a single text
-            chunk_text = " ".join(chunk_sentences)
-            # Create a chunk object with ID and text
-            chunks.append({
-                "id": len(chunks),  # Integer ID instead of string
-                "text": chunk_text
-            })
-
-    # Print chunk statistics
-    print(f"Split document into {len(chunks)} chunks")
-    for i, chunk in enumerate(chunks):
-        token_count = len(tokenizer.encode(chunk["text"]))
-        print(f"Chunk {i}: {token_count} tokens")
-
-    return chunks
-
-endpoint_mini = os.getenv("AZURE_OPENAI_ENDPOINT_MINI")
-key_mini = os.getenv("AZURE_OPENAI_API_KEY_MINI")
-
-client_mini = AzureOpenAI(
-    api_key=key_mini,
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION_MINI"),
-    azure_endpoint=endpoint_mini
-)
-deployment_mini = os.getenv("AZURE_OPENAI_DEPLOYMENT_MINI")
-
-endpoint_nano = os.getenv("AZURE_OPENAI_ENDPOINT_NANO")
-key_nano = os.getenv("AZURE_OPENAI_API_KEY_NANO")
-
-client_nano = AzureOpenAI(
-    api_key=key_nano,
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION_NANO"),
-    azure_endpoint=endpoint_nano
-)
-deployment_nano = os.getenv("AZURE_OPENAI_DEPLOYMENT_NANO")
+        return chunks
+    except Exception as e:
+        print(f"Error in split_into_50_chunks: {str(e)}")
+        # Return a single chunk with the entire text if there's an error
+        return [{"id": 0, "text": text, "pages": [1]}]
 
 def create_routing_prompt(question: str, chunks: List[Dict], depth: int, scratchpad: str) -> str:
     """Create a prompt for routing chunks based on the question."""
@@ -161,15 +184,16 @@ def get_routing_decision(prompt: str) -> Dict:
     try:
         start_time = time.time()
         
-        response = client_mini.chat.completions.create(
-            model=deployment_mini,
+        client, deployment = get_nano_client()
+        response = client.chat.completions.create(
+            model=deployment,
             messages=[
-                {"role": "system", "content": "Select relevant chunks. Return JSON with 'selected_ids' and brief 'scratchpad'."},
+                {"role": "system", "content": "Select relevant chunks. Return JSON: {\"selected_ids\": [\"id1\", \"id2\"], \"scratchpad\": \"brief reason\"}"},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
             temperature=0.3,
-            max_tokens=800  # Increased from 300 to prevent truncation
+            max_tokens=400  # Reduced from 800 since we need less detailed reasoning
         )
         
         api_time = time.time() - start_time
@@ -245,23 +269,15 @@ def process_batch(args: Tuple[str, List[Dict], int, int]) -> Dict:
     print(f"\nProcessing batch {batch_num} of {total_batches}")
     print(f"Chunks {batch_chunks[0]['id']} to {batch_chunks[-1]['id']}")
     
-    # Create a prompt for the batch with more explicit reasoning requirements
-    batch_prompt = f"""You are a routing system that helps find relevant information in a document.
-Your task is to identify which chunks of text are most relevant to answering the following question:
+    # Create a simplified prompt for the batch
+    batch_prompt = f"""You are a routing system that finds relevant information in a document.
+Identify which chunks are most relevant to answering this question:
 
 QUESTION: {question}
 
-For each chunk, you MUST:
-1. Evaluate if it contains information relevant to the question
-2. Explain WHY you selected or rejected each chunk
-3. Provide detailed reasoning about the relevance of selected chunks
-
-Respond with a JSON object containing:
+Return a JSON object with:
 1. "selected_ids": List of chunk IDs that contain relevant information
-2. "scratchpad": Your detailed reasoning about why these chunks are relevant, including:
-   - Why each selected chunk is relevant to the question
-   - How the information in each chunk helps answer the question
-   - Any connections between different chunks
+2. "scratchpad": Brief reason for selection
 
 CHUNKS:
 """
@@ -274,7 +290,7 @@ CHUNKS:
     
     # Ensure scratchpad is not empty
     if not routing_decision.get("scratchpad"):
-        routing_decision["scratchpad"] = f"Selected chunks {routing_decision['selected_ids']} based on relevance to the question: {question}"
+        routing_decision["scratchpad"] = f"Selected chunks {routing_decision['selected_ids']} as relevant to: {question}"
     
     batch_time = time.time() - batch_start_time
     print(f"Batch {batch_num} completed in {batch_time:.2f} seconds")
@@ -284,6 +300,8 @@ CHUNKS:
 def route_chunks(question: str, chunks: List[Dict], depth: int = 0, scratchpad: str = "") -> Dict:
     """Route chunks to find the most relevant ones for the question."""
     print(f"\n==== ROUTING AT DEPTH {depth} ====")
+    print(f"Question: {question}")
+    print(f"Number of chunks to evaluate: {len(chunks)}")
     
     start_time = time.time()
     timeout = 20  # Increased from 15 to 20 seconds
@@ -302,283 +320,319 @@ def route_chunks(question: str, chunks: List[Dict], depth: int = 0, scratchpad: 
         batch_num = i//max_chunks_per_batch + 1
         total_batches = (total_chunks + max_chunks_per_batch - 1)//max_chunks_per_batch
         batches.append((question, batch_chunks, batch_num, total_batches))
+        print(f"\nBatch {batch_num}/{total_batches}:")
+        for chunk in batch_chunks:
+            print(f"Chunk {chunk['id']}: {chunk['text'][:100]}...")
     
     # Process batches in parallel
     all_selected_ids = set()
     all_scratchpad = []
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        future_to_batch = {executor.submit(process_batch, batch): batch for batch in batches}
+    for batch in batches:
+        question, batch_chunks, batch_num, total_batches = batch
+        print(f"\nProcessing batch {batch_num}/{total_batches}")
         
-        for future in concurrent.futures.as_completed(future_to_batch):
-            if time.time() - start_time > timeout:
-                print(f"Routing timeout reached after {time.time() - start_time:.2f} seconds")
-                break
-                
-            try:
-                routing_decision = future.result()
-                if routing_decision["selected_ids"]:
-                    all_selected_ids.update(routing_decision["selected_ids"])
-                    print(f"Selected {len(routing_decision['selected_ids'])} chunks in this batch")
-                
-                # Always append reasoning, even if no chunks were selected
-                if routing_decision["scratchpad"]:
-                    all_scratchpad.append(routing_decision["scratchpad"])
-                
-                # Only stop early if we have both enough chunks AND reasoning
-                if len(all_selected_ids) >= min_chunks_to_find and all_scratchpad:
-                    print(f"Found sufficient chunks ({len(all_selected_ids)}) and reasoning, stopping early")
-                    break
-            except Exception as e:
-                print(f"Error processing batch: {e}")
-                all_scratchpad.append(f"Error in batch processing: {str(e)}")
+        # Create simplified prompt for this batch
+        prompt = f"""Question: {question}
+
+Select relevant chunks that help answer the question.
+
+Return JSON: {{"selected_ids": [chunk_ids], "reasoning": "brief reason"}}
+
+Chunks:
+{json.dumps(batch_chunks, indent=2)}"""
+
+        try:
+            # Call the model
+            client, deployment = get_mini_client()
+            response = client.chat.completions.create(
+                model=deployment,
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant that selects relevant text chunks."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+            
+            # Parse response
+            result = json.loads(response.choices[0].message.content.strip())
+            selected_ids = result.get("selected_ids", [])
+            reasoning = result.get("reasoning", "")
+            
+            print(f"\nBatch {batch_num} results:")
+            print(f"Selected IDs: {selected_ids}")
+            print(f"Reasoning: {reasoning}")
+            
+            # Add selected IDs to the set
+            all_selected_ids.update(selected_ids)
+            all_scratchpad.append(reasoning)
+            
+        except Exception as e:
+            print(f"Error processing batch {batch_num}: {str(e)}")
+            continue
     
-    # Combine results
-    result = {
+    # If we found fewer than min_chunks_to_find chunks, try to find more
+    if len(all_selected_ids) < min_chunks_to_find and depth == 0:
+        print(f"\nFound only {len(all_selected_ids)} chunks, trying to find more...")
+        # Try with a more lenient prompt
+        prompt = f"""Question: {question}
+
+Context:
+{json.dumps(chunks, indent=2)}
+
+Instructions:
+1. Select ANY chunks that might be relevant to the question, even if indirectly
+2. Consider both direct matches and semantic relevance
+3. Return a JSON object with:
+   - selected_ids: List of chunk IDs that are relevant
+   - reasoning: Brief explanation of why these chunks are relevant
+4. Try to find at least {min_chunks_to_find} chunks
+
+Response:"""
+
+        try:
+            client, deployment = get_mini_client()
+            response = client.chat.completions.create(
+                model=deployment,
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant that selects relevant text chunks."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+            
+            result = json.loads(response.choices[0].message.content.strip())
+            selected_ids = result.get("selected_ids", [])
+            reasoning = result.get("reasoning", "")
+            
+            print(f"\nAdditional chunks found:")
+            print(f"Selected IDs: {selected_ids}")
+            print(f"Reasoning: {reasoning}")
+            
+            all_selected_ids.update(selected_ids)
+            all_scratchpad.append(reasoning)
+            
+        except Exception as e:
+            print(f"Error finding additional chunks: {str(e)}")
+    
+    print(f"\nFinal results:")
+    print(f"Total selected chunks: {len(all_selected_ids)}")
+    print(f"Selected IDs: {all_selected_ids}")
+    
+    return {
         "selected_ids": list(all_selected_ids),
-        "scratchpad": "\n\n".join(all_scratchpad) if all_scratchpad else "No reasoning generated due to processing issues."
+        "scratchpad": "\n".join(all_scratchpad)
     }
+
+def navigate_to_paragraphs(question: str, chunks: List[Dict], depth: int = 0) -> List[Dict]:
+    """Navigate through the document hierarchy to find relevant paragraphs."""
+    print(f"\n==== NAVIGATING AT DEPTH {depth} ====")
+    print(f"Question: {question}")
+    print(f"Number of chunks provided: {len(chunks)}")
     
-    print(f"\nRouting completed in {time.time() - start_time:.2f} seconds")
-    print(f"Total chunks selected: {len(result['selected_ids'])}")
-    print(f"Reasoning length: {len(result['scratchpad'])} characters")
-    
-    return result
-
-def navigate_to_paragraphs(document_text: str, question: str, max_depth: int = 1, chunks: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Navigate through the document hierarchy to find relevant paragraphs.
-
-    Args:
-        document_text: The full document text
-        question: The user's question
-        max_depth: Maximum depth to navigate before returning paragraphs (default: 1)
-        chunks: Pre-computed chunks to use (optional)
-
-    Returns:
-        Dictionary with selected paragraphs and final scratchpad
-    """
-    scratchpad = ""
-
-    # Use provided chunks or create new ones
-    if chunks is None:
-        chunks = split_into_50_chunks(document_text, min_tokens=500)
-
-    # Navigator state - track chunk paths to maintain hierarchy
-    chunk_paths = {}  # Maps numeric IDs to path strings for display
+    # First, check if any chunks are from the first page
+    first_page_chunks = []
     for chunk in chunks:
-        chunk_paths[chunk["id"]] = str(chunk["id"])
-
-    # Navigate through levels until max_depth or until no chunks remain
-    for current_depth in range(max_depth + 1):
-        # Call router to get relevant chunks
-        result = route_chunks(question, chunks, current_depth, scratchpad)
-
-        # Update scratchpad
-        scratchpad = result["scratchpad"]
-
-        # Get selected chunks
-        selected_ids = result["selected_ids"]
-        selected_chunks = [c for c in chunks if c["id"] in selected_ids]
-
-        # If no chunks were selected, return empty result
-        if not selected_chunks:
-            print("\nNo relevant chunks found.")
-            return {"paragraphs": [], "scratchpad": scratchpad}
-
-        # If we've reached max_depth, return the selected chunks
-        if current_depth == max_depth:
-            print(f"\nReturning {len(selected_chunks)} relevant chunks at depth {current_depth}")
-
-            # Update display IDs and format paragraphs
-            formatted_chunks = []
-            for chunk in selected_chunks:
-                display_id = chunk_paths[chunk["id"]]
-                formatted_chunk = {
-                    "id": chunk["id"],
-                    "display_id": display_id,
-                    "text": chunk["text"],
-                    "pages": chunk.get("pages", [])  # Preserve page numbers
-                }
-                formatted_chunks.append(formatted_chunk)
-
-            return {"paragraphs": formatted_chunks, "scratchpad": scratchpad}
-
-        # Prepare next level by splitting selected chunks further
-        next_level_chunks = []
-        next_chunk_id = 0  # Counter for new chunks
-
+        if chunk.get('page_number') == 1:
+            first_page_chunks.append(chunk)
+    
+    print(f"\nFirst page chunks found: {len(first_page_chunks)}")
+    if first_page_chunks:
+        print("Prioritizing first page chunks...")
+        chunks = first_page_chunks
+    
+    # Get the most relevant chunks
+    result = route_chunks(question, chunks, depth)
+    selected_ids = result["selected_ids"]
+    scratchpad = result["scratchpad"]
+    
+    print(f"\nSelected chunk IDs: {selected_ids}")
+    print(f"Scratchpad: {scratchpad}")
+    
+    # If we found relevant chunks, return them
+    if selected_ids:
+        selected_chunks = [chunk for chunk in chunks if chunk["id"] in selected_ids]
+        print(f"\nReturning {len(selected_chunks)} selected chunks")
         for chunk in selected_chunks:
-            # Split this chunk into smaller pieces
-            sub_chunks = split_into_50_chunks(chunk["text"], min_tokens=200)
+            print(f"Chunk {chunk['id']} (Page {chunk.get('page_number', 'N/A')}): {chunk['text'][:100]}...")
+        return selected_chunks
+    
+    # If we didn't find any chunks and we're at depth 0, try a more general search
+    if depth == 0:
+        print("\nNo chunks found at depth 0, trying more general search...")
+        # Try with a more general prompt
+        result = route_chunks(
+            f"Find any information that might be related to: {question}",
+            chunks,
+            depth + 1,
+            scratchpad
+        )
+        selected_ids = result["selected_ids"]
+        if selected_ids:
+            selected_chunks = [chunk for chunk in chunks if chunk["id"] in selected_ids]
+            print(f"\nFound {len(selected_chunks)} chunks in general search")
+            for chunk in selected_chunks:
+                print(f"Chunk {chunk['id']} (Page {chunk.get('page_number', 'N/A')}): {chunk['text'][:100]}...")
+            return selected_chunks
+    
+    print("\nNo relevant chunks found")
+    return []
 
-            # Update IDs and maintain path mapping
-            for sub_chunk in sub_chunks:
-                path = f"{chunk_paths[chunk['id']]}.{sub_chunk['id']}"
-                sub_chunk["id"] = next_chunk_id
-                sub_chunk["pages"] = chunk.get("pages", [])  # Preserve page numbers
-                chunk_paths[next_chunk_id] = path
-                next_level_chunks.append(sub_chunk)
-                next_chunk_id += 1
-
-        # Update chunks for next iteration
-        chunks = next_level_chunks
-
-    # If we get here, return the last selected chunks
-    return {"paragraphs": selected_chunks, "scratchpad": scratchpad}
-
+# Rest of the file with Answer class and generate_answer function
 from pydantic import BaseModel, field_validator
+from typing import Optional
 
 class Answer(BaseModel):
     """Structured response format for questions"""
     answer: str
     citations: List[Dict[str, str]]  # Changed from List[str] to List[Dict[str, str]]
-
+    usage: Dict[str, int] = {
+        "total_tokens": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0
+    }
+    cost: Dict[str, float] = {
+        "total_cost": 0.0,
+        "input_cost": 0.0,
+        "output_cost": 0.0
+    }
+    
     @field_validator('citations')
     def validate_citations(cls, citations, info):
         # Access valid_citations from the model_config
-        valid_citations = info.data.get('_valid_citations', [])
-        if valid_citations:
-            for citation in citations:
-                if citation.get('id') not in valid_citations:
-                    raise ValueError(f"Invalid citation: {citation.get('id')}. Must be one of: {valid_citations}")
-                # Ensure page field is a string and properly formatted
-                if 'page' in citation:
-                    if not isinstance(citation['page'], str):
-                        if isinstance(citation['page'], list):
-                            citation['page'] = f"Page {', '.join(map(str, citation['page']))}"
-                        else:
-                            citation['page'] = "Page 1"  # Default if not string or list
-                    elif not citation['page'].startswith('Page '):
-                        citation['page'] = f"Page {citation['page']}"
-                else:
-                    citation['page'] = "Page 1"  # Default if missing
+        valid_citations = getattr(cls.model_config, 'valid_citations', [])
+        
+        # If no valid citations are provided, skip validation
+        if not valid_citations:
+            return citations
+        
+        # Validate each citation
+        for citation in citations:
+            if isinstance(citation, dict) and 'text' in citation:
+                citation_text = citation['text']
+                if not any(valid_citation in citation_text for valid_citation in valid_citations):
+                    raise ValueError(f"Citation '{citation_text}' not found in source material")
+            elif isinstance(citation, str):
+                if not any(valid_citation in citation for valid_citation in valid_citations):
+                    raise ValueError(f"Citation '{citation}' not found in source material")
+        
         return citations
 
 def format_page_string(pages) -> str:
-    """Helper function to format page numbers consistently"""
+    """Format page numbers for display."""
     if not pages:
-        return "Page 1"
-    if isinstance(pages, str):
-        if pages.startswith('Page '):
-            return pages
-        return f"Page {pages}"
-    if isinstance(pages, list):
-        return f"Page {', '.join(map(str, pages))}"
-    return "Page 1"
+        return "Unknown"
+    if len(pages) == 1:
+        return f"Page {pages[0]}"
+    else:
+        return f"Pages {'-'.join(map(str, sorted(set(pages))))}"
 
-def generate_answer(question: str, paragraphs: List[Dict[str, Any]],
-                   scratchpad: str) -> Answer:
-    """Generate an answer from the retrieved paragraphs."""
-    print("\n==== GENERATING ANSWER ====")
-
-    valid_citations = [str(p.get("display_id", str(p["id"]))) for p in paragraphs]
-
-    if not paragraphs:
-        print("No paragraphs found for answer generation.")
-        return Answer(
-            answer="I couldn't find relevant information to answer this question in the document.",
-            citations=[],
-            _valid_citations=[]
-        )
-
-    context = ""
-    for paragraph in paragraphs:
-        display_id = paragraph.get("display_id", str(paragraph["id"]))
-        context += f"PARAGRAPH {display_id}:\n{paragraph['text']}\n\n"
-
-    valid_citations_str = ", ".join(valid_citations)
-    system_prompt = f"""You are an AI assistant helping with document analysis.\n\nAnswer the question using ONLY the provided paragraphs. Do not use external knowledge.\n\nFormat your response in markdown with the following sections:\n## Answer\n(Your answer here, do NOT include citations or references in this section.)\n\n## Citations\n- For each citation, use a bullet point in this format:\n  - [Section Name] (ID: <id>): \"Relevant excerpt from the paragraph\" (Page: <page_numbers>)\n\nExample:\n## Answer\nAOP stands for Annual Operating Plan. It is used for...\n\n## Citations\n- [AOP Definition] (ID: 2): \"AOP Annual Operating Plan revenue is typically defined at a monthly or period level...\" (Page: 1, 2)\n- [COGS Calculation] (ID: 3): \"COGS values are stored in the i n t e r i m w s s i a o p d a t a table...\" (Page: 3)\n\nIMPORTANT: Always include page numbers in your citations. If you don't know the exact page numbers, use the page numbers from the paragraph's metadata."""
-
-    try:
-        response = client_nano.chat.completions.create(
-            model=deployment_nano,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"QUESTION: {question}\n\nSCRATCHPAD (Navigation reasoning):\n{scratchpad}\n\nPARAGRAPHS:\n{context}"}
-            ],
-            temperature=0.3
-        )
-
-        response_content = response.choices[0].message.content.strip()
-        print("\n[LOG] Raw LLM response:\n", response_content)
-
-        answer_match = re.search(r"## Answer\n([\s\S]*?)(?=\n## Citations|\Z)", response_content)
-        citations_match = re.search(r"## Citations\n([\s\S]*)", response_content)
-        answer_text = answer_match.group(1).strip() if answer_match else ""
-        citations_text = citations_match.group(1).strip() if citations_match else ""
-
-        print("\n[LOG] Extracted ## Answer section:\n", answer_text)
-        print("\n[LOG] Extracted ## Citations section:\n", citations_text)
-
-        citations = []
-        for line in citations_text.splitlines():
-            line = line.strip()
-            if not line.startswith("-"):
-                continue
-            # Updated regex to capture page numbers
-            m = re.match(r"- \[(.*?)\] \(ID: (.*?)\): \"([\s\S]*?)\" \(Page: (.*?)\)", line)
-            if m:
-                section, cid, text, pages = m.groups()
-                citations.append({
-                    "id": cid,
-                    "section": section,
-                    "text": text,
-                    "page": format_page_string(pages)
-                })
-            else:
-                # Fallback to old format if page numbers are missing
-                m = re.match(r"- \[(.*?)\] \(ID: (.*?)\): \"([\s\S]*?)\"", line)
-                if m:
-                    section, cid, text = m.groups()
-                    citations.append({
-                        "id": cid,
-                        "section": section,
-                        "text": text,
-                        "page": "Page 1"  # Default page number
-                    })
+def generate_answer(question: str, paragraphs: List[Dict]) -> Answer:
+    """
+    Generate an answer using the main model based on selected paragraphs.
+    
+    Args:
+        question: The user's question
+        paragraphs: List of relevant paragraph dictionaries
         
-        # If no citations were parsed from the LLM response, create them from paragraphs
-        if not citations:
-            for p in paragraphs:
-                display_id = p.get("display_id", str(p["id"]))
-                pages = p.get("pages", [])
-                citations.append({
-                    "id": display_id,
-                    "section": f"Section {display_id}",
-                    "text": p.get("text", ""),
-                    "page": format_page_string(pages)
-                })
+    Returns:
+        Answer object with structured response
+    """
+    try:
+        # Get main client configuration
+        config = get_azure_config('main')
+        
+        client_main = AzureOpenAI(
+            api_key=config['api_key'],
+            api_version=config['api_version'],
+            azure_endpoint=config['endpoint'],
+            http_client=httpx.Client()
+        )
+        deployment_main = config['deployment_name']
+        
+        print(f"Main client initialized successfully with deployment: {deployment_main}")
+        
+        # Prepare context from paragraphs
+        context = ""
+        for i, para in enumerate(paragraphs):
+            page_info = format_page_string(para.get('pages', [1]))
+            context += f"\n[Source {i+1} - {page_info}]\n{para['text']}\n"
+        
+        # Create the prompt
+        prompt = f"""Based on the following context, please answer the question. Provide a comprehensive answer with specific citations.
 
-        print("\n[LOG] Parsed citations array:")
-        for c in citations:
-            print(c)
-            
-        answer = Answer(
+Context:
+{context}
+
+Question: {question}
+
+Please provide:
+1. A detailed answer to the question
+2. Specific citations from the context (include the source number and page)
+3. If the information is not available in the context, clearly state that
+
+Answer:"""
+
+        # Call the main model
+        start_time = time.time()
+        response = client_main.chat.completions.create(
+            model=deployment_main,
+            messages=[
+                {"role": "system", "content": "You are a helpful AI assistant that provides detailed answers with accurate citations."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=1500
+        )
+        
+        api_time = time.time() - start_time
+        print(f"Main model API call took {api_time:.2f} seconds")
+        
+        # Extract the answer
+        answer_text = response.choices[0].message.content.strip()
+        
+        # Create citations from the paragraphs
+        citations = []
+        for i, para in enumerate(paragraphs):
+            page_info = format_page_string(para.get('pages', [1]))
+            citations.append({
+                "text": para['text'][:200] + "..." if len(para['text']) > 200 else para['text'],
+                "page": page_info,
+                "source": f"Source {i+1}"
+            })
+        
+        # Calculate usage and cost (simplified)
+        usage = {
+            "total_tokens": response.usage.total_tokens,
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens
+        }
+        
+        # Simplified cost calculation (you may want to adjust these rates)
+        input_cost = usage["prompt_tokens"] * 0.00001  # $0.01 per 1K tokens
+        output_cost = usage["completion_tokens"] * 0.00003  # $0.03 per 1K tokens
+        total_cost = input_cost + output_cost
+        
+        cost = {
+            "total_cost": total_cost,
+            "input_cost": input_cost,
+            "output_cost": output_cost
+        }
+        
+        return Answer(
             answer=answer_text,
             citations=citations,
-            _valid_citations=valid_citations
+            usage=usage,
+            cost=cost
         )
+        
     except Exception as e:
-        print(f"Error generating answer: {e}")
-        citations = []
-        for p in paragraphs:
-            display_id = p.get("display_id", str(p["id"]))
-            pages = p.get("pages", [])
-            citations.append({
-                "id": display_id,
-                "section": f"Section {display_id}",
-                "text": p.get("text", ""),
-                "page": format_page_string(pages)
-            })
-        answer = Answer(
-            answer="Error generating answer. Please try again.",
-            citations=citations,
-            _valid_citations=valid_citations
-        )
-
-    print(f"\n[LOG] Final answer to return: {answer.answer}")
-    print(f"[LOG] Final citations to return: {answer.citations}")
-
-    return answer
-
+        print(f"Error generating answer: {str(e)}")
+        return Answer(
+            answer=f"I apologize, but I encountered an error while generating the answer: {str(e)}",
+            citations=[],
+            usage={"total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0},
+            cost={"total_cost": 0.0, "input_cost": 0.0, "output_cost": 0.0}
+        ) 

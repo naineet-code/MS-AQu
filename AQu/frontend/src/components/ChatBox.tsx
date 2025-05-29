@@ -35,6 +35,29 @@ const ResponseContainer = styled(motion.div)(({ theme }) => ({
   borderTop: '1px solid rgba(0, 0, 0, 0.1)',
 }));
 
+const SectionHeader = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  background: 'linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%)',
+  color: 'white',
+  px: 3,
+  py: 1.5,
+  cursor: 'pointer',
+  userSelect: 'none',
+  borderRadius: '8px 8px 0 0',
+}));
+
+const SectionContent = styled(Box)(({ theme }) => ({
+  backgroundColor: 'rgba(124, 58, 237, 0.08)',
+  px: 3,
+  py: 2,
+  color: 'text.primary',
+  fontFamily: 'inherit',
+  fontSize: '1rem',
+  borderRadius: '0 0 8px 8px',
+}));
+
 const CitationsContainer = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(1),
   fontSize: '0.9rem',
@@ -47,6 +70,49 @@ const Citation = styled(Box)(({ theme }) => ({
   padding: theme.spacing(0.5, 1),
   backgroundColor: 'rgba(0, 0, 0, 0.05)',
   borderRadius: theme.spacing(1),
+}));
+
+const PageLink = styled('a')(({ theme }) => ({
+  color: theme.palette.primary.main,
+  textDecoration: 'none',
+  fontWeight: 500,
+  marginLeft: theme.spacing(1),
+  '&:hover': {
+    textDecoration: 'underline',
+  },
+}));
+
+const RelevantSection = styled(Box)(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+  '& .section-header': {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: theme.spacing(1, 2),
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    borderRadius: '4px',
+    marginBottom: theme.spacing(1),
+  },
+  '& .section-content': {
+    padding: theme.spacing(2),
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: '4px',
+  },
+}));
+
+const UsageStats = styled(Box)(({ theme }) => ({
+  marginTop: theme.spacing(2),
+  padding: theme.spacing(2),
+  backgroundColor: 'rgba(0, 0, 0, 0.02)',
+  borderRadius: '8px',
+  '& .stat-row': {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing(1),
+    '&:last-child': {
+      marginBottom: 0,
+    },
+  },
 }));
 
 // CollapsibleSection component for consistent style
@@ -97,6 +163,17 @@ interface ChatBoxProps {
     citations: any[];
     reasoning: string;
     relevant_paragraphs: any[];
+    usage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
+    cost: {
+      input_cost: number;
+      output_cost: number;
+      total_cost: number;
+    };
+    model: string;
   }>;
 }
 
@@ -107,7 +184,9 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ onQuestionSubmit }) => {
   const [citations, setCitations] = useState<any[]>([]);
   const [reasoning, setReasoning] = useState('');
   const [relevantParagraphs, setRelevantParagraphs] = useState<any[]>([]);
+  const [usageStats, setUsageStats] = useState<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
 
   const handleSubmit = async () => {
     if (!question.trim()) return;
@@ -119,6 +198,11 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ onQuestionSubmit }) => {
       setCitations(result.citations);
       setReasoning(result.reasoning);
       setRelevantParagraphs(result.relevant_paragraphs);
+      setUsageStats({
+        model: result.model,
+        usage: result.usage,
+        cost: result.cost
+      });
       setMode('response');
     } catch (error) {
       console.error('Error submitting question:', error);
@@ -134,6 +218,13 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ onQuestionSubmit }) => {
     setRelevantParagraphs([]);
     setMode('focused');
     inputRef.current?.focus();
+  };
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
   };
 
   const containerVariants = {
@@ -157,6 +248,84 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ onQuestionSubmit }) => {
       scale: 1,
       opacity: 1,
     },
+  };
+
+  const renderRelevantSections = () => {
+    if (!relevantParagraphs.length) return null;
+
+    return (
+      <CollapsibleSection title="Relevant Sections" defaultOpen={true}>
+        {relevantParagraphs.map((para, index) => {
+          const sectionId = `section-${index}`;
+          const isExpanded = expandedSections[sectionId];
+          
+          return (
+            <RelevantSection key={index}>
+              <Box className="section-header">
+                <Typography variant="subtitle1">
+                  Section {index + 1}
+                  {para.pages && para.pages.length > 0 && (
+                    <PageLink href={`/pdf/${para.category || 'reliance'}/${para.filename || 'reliance_faq.pdf'}#page=${para.pages[0]}`} target="_blank">
+                      (Page {para.pages.join(', ')})
+                    </PageLink>
+                  )}
+                </Typography>
+                <IconButton size="small" onClick={() => toggleSection(sectionId)}>
+                  <ExpandMoreIcon sx={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.2s' }} />
+                </IconButton>
+              </Box>
+              {isExpanded && (
+                <Box className="section-content">
+                  <Typography variant="body1" component="div">
+                    {para.text}
+                  </Typography>
+                </Box>
+              )}
+            </RelevantSection>
+          );
+        })}
+      </CollapsibleSection>
+    );
+  };
+
+  const renderUsageStats = () => {
+    if (!usageStats) return null;
+
+    return (
+      <UsageStats>
+        <Typography variant="subtitle2" color="primary" gutterBottom>
+          Usage Statistics
+        </Typography>
+        <Box className="stat-row">
+          <Typography variant="body2">Model:</Typography>
+          <Typography variant="body2">{usageStats.model}</Typography>
+        </Box>
+        <Box className="stat-row">
+          <Typography variant="body2">Prompt Tokens:</Typography>
+          <Typography variant="body2">{usageStats.usage.prompt_tokens}</Typography>
+        </Box>
+        <Box className="stat-row">
+          <Typography variant="body2">Completion Tokens:</Typography>
+          <Typography variant="body2">{usageStats.usage.completion_tokens}</Typography>
+        </Box>
+        <Box className="stat-row">
+          <Typography variant="body2">Total Tokens:</Typography>
+          <Typography variant="body2">{usageStats.usage.total_tokens}</Typography>
+        </Box>
+        <Box className="stat-row">
+          <Typography variant="body2">Input Cost:</Typography>
+          <Typography variant="body2">${usageStats.cost.input_cost.toFixed(6)}</Typography>
+        </Box>
+        <Box className="stat-row">
+          <Typography variant="body2">Output Cost:</Typography>
+          <Typography variant="body2">${usageStats.cost.output_cost.toFixed(6)}</Typography>
+        </Box>
+        <Box className="stat-row">
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Total Cost:</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>${usageStats.cost.total_cost.toFixed(6)}</Typography>
+        </Box>
+      </UsageStats>
+    );
   };
 
   return (
@@ -212,49 +381,24 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ onQuestionSubmit }) => {
             transition={{ duration: 0.3 }}
           >
             {/* Answer Section */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ mb: 1, color: 'primary.main' }}>Answer</Typography>
-              <Box sx={{ 
-                whiteSpace: 'pre-wrap',
-                backgroundColor: 'rgba(0, 0, 0, 0.02)',
-                p: 2,
-                borderRadius: 1
-              }}>{answer}</Box>
-            </Box>
+            <CollapsibleSection title="Answer" defaultOpen={true}>
+              <Typography variant="body1" component="div" sx={{ whiteSpace: 'pre-wrap' }}>
+                {answer}
+              </Typography>
+            </CollapsibleSection>
 
-            {/* Reasoning Section (collapsible, visually matches Relevant Paragraphs) */}
-            {reasoning && (
-              <CollapsibleSection title="Reasoning">
+            {/* Reasoning Section */}
+            <CollapsibleSection title="Reasoning" defaultOpen={false}>
+              <Typography variant="body2" color="text.secondary">
                 {reasoning}
-              </CollapsibleSection>
-            )}
+              </Typography>
+            </CollapsibleSection>
 
-            {/* Relevant Paragraphs Section (collapsible) */}
-            {relevantParagraphs.length > 0 && (
-              <CollapsibleSection title="Relevant Paragraphs">
-                {relevantParagraphs.map((para, idx) => (
-                  <Box key={idx} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>{para.pages}</Typography>
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{para.text}</Typography>
-                  </Box>
-                ))}
-              </CollapsibleSection>
-            )}
+            {/* Relevant Sections */}
+            {renderRelevantSections()}
 
-            {/* References Section (collapsible) */}
-            {citations.length > 0 && (
-              <CollapsibleSection title="References">
-                <CitationsContainer>
-                  {citations.map((citation, index) => (
-                    <Citation key={index}>
-                      {citation.section && <strong>{citation.section}: </strong>}
-                      {citation.text}
-                      {citation.page && <span> (Page {citation.page})</span>}
-                    </Citation>
-                  ))}
-                </CitationsContainer>
-              </CollapsibleSection>
-            )}
+            {/* Usage Statistics */}
+            {renderUsageStats()}
           </ResponseContainer>
         )}
       </AnimatePresence>

@@ -1,2 +1,2 @@
 [backend]
-url = "http://57.154.209.147:8000" 
+url = "http://localhost:8000" 

@@ -1,5 +1,5 @@
 import React from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
@@ -13,6 +13,7 @@ interface QuestionResponseSectionProps {
   onNewQuestion: () => void;
   loading: boolean;
   responseData: any;
+  backendUrl: string | null;
 }
 
 const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
@@ -20,10 +21,21 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
   isVisible,
   onNewQuestion,
   loading,
-  responseData
+  responseData,
+  backendUrl
 }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+
+  console.log('🔍 QuestionResponseSection render:', { 
+    question, 
+    isVisible, 
+    loading, 
+    responseData, 
+    backendUrl,
+    hasResponseData: !!responseData,
+    responseDataKeys: responseData ? Object.keys(responseData) : []
+  });
 
   if (!isVisible) return null;
 
@@ -114,7 +126,7 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
               padding: 0,
             }}
           >
-            <ResponseCard data={responseData} />
+            <ResponseCard data={responseData} backendUrl={backendUrl} />
           </motion.div>
         )}
       </AnimatePresence>
