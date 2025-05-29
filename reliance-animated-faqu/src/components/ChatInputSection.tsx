@@ -159,7 +159,7 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
         } shadow-2xl`}
       >
         <Card className="bg-transparent border-0 shadow-none rounded-3xl">
-          <CardContent className="p-6 rounded-3xl">
+          <CardContent className="p-4 rounded-3xl">
             <PlaceholdersAndVanishInput
               placeholders={chatPlaceholders}
               onChange={handleChatChange}

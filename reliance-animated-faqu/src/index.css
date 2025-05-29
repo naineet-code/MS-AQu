@@ -6,6 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* Apple-inspired color system */
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -42,24 +43,49 @@
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  /* Apple-inspired radius system */
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
 
-  --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up: accordion-up 0.2s ease-out;
-  --animate-first: first 30s infinite;
-  --animate-second: second 30s infinite;
-  --animate-third: third 30s infinite;
-  --animate-fourth: fourth 30s infinite;
-  --animate-fifth: fifth 30s infinite;
+  /* Apple-inspired spacing system */
+  --spacing-apple-xs: 4px;
+  --spacing-apple-sm: 8px;
+  --spacing-apple-md: 16px;
+  --spacing-apple-lg: 24px;
+  --spacing-apple-xl: 32px;
+  --spacing-apple-2xl: 48px;
+  --spacing-apple-3xl: 64px;
+
+  /* Apple-inspired typography scale */
+  --font-size-apple-caption: 11px;
+  --font-size-apple-footnote: 13px;
+  --font-size-apple-body: 17px;
+  --font-size-apple-headline: 20px;
+  --font-size-apple-title: 28px;
+  --font-size-apple-large-title: 34px;
+
+  /* Apple-inspired layout constraints */
+  --max-width-apple-compact: 375px;
+  --max-width-apple-regular: 768px;
+  --max-width-apple-large: 1024px;
+  --max-width-apple-reading: 680px;
+
+  /* Enhanced animations with Apple-like easing */
+  --animate-accordion-down: accordion-down 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --animate-accordion-up: accordion-up 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --animate-apple-bounce: apple-bounce 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --animate-apple-fade: apple-fade 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --animate-apple-slide: apple-slide 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --animate-gradient: gradient 3s ease infinite;
-  --animate-hover-tada: hover-tada 1s ease-in-out;
+  --animate-hover-lift: hover-lift 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --animate-pulse-subtle: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 
-  /* Enhanced theme transition durations for Tailwind v4 */
-  --theme-transition-fast: 300ms;
-  --theme-transition-normal: 700ms;
-  --theme-transition-slow: 1000ms;
+  /* Apple-inspired transition durations */
+  --theme-transition-fast: 200ms;
+  --theme-transition-normal: 300ms;
+  --theme-transition-slow: 500ms;
 
   @keyframes accordion-down {
     from {
@@ -77,60 +103,48 @@
       height: 0;
     }
   }
-  @keyframes first {
-    0%,
-    16.667%,
-    100% {
-      opacity: 1;
+  @keyframes apple-bounce {
+    0%, 100% {
+      transform: scale(1) translateY(0);
     }
-    33.333%,
-    83.333% {
-      opacity: 0;
-    }
-  }
-  @keyframes second {
-    0%,
-    16.667%,
-    66.667%,
-    100% {
-      opacity: 0;
-    }
-    33.333%,
     50% {
-      opacity: 1;
+      transform: scale(1.05) translateY(-2px);
     }
   }
-  @keyframes third {
-    0%,
-    50%,
-    100% {
+  @keyframes apple-fade {
+    from {
       opacity: 0;
+      transform: translateY(8px);
     }
-    66.667%,
-    83.333% {
+    to {
       opacity: 1;
+      transform: translateY(0);
     }
   }
-  @keyframes fourth {
-    0%,
-    50%,
-    100% {
+  @keyframes apple-slide {
+    from {
       opacity: 0;
+      transform: translateX(-12px);
     }
-    66.667%,
-    83.333% {
+    to {
       opacity: 1;
+      transform: translateX(0);
     }
   }
-  @keyframes fifth {
-    0%,
-    83.333%,
-    100% {
-      opacity: 0;
+  @keyframes hover-lift {
+    0% {
+      transform: translateY(0);
     }
-    16.667%,
-    33.333% {
+    100% {
+      transform: translateY(-1px);
+    }
+  }
+  @keyframes pulse-subtle {
+    0%, 100% {
       opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
     }
   }
   @keyframes gradient {
@@ -144,86 +158,96 @@
       background-position: 0% 50%;
     }
   }
-  @keyframes hover-tada {
-    0% {
-      transform: scale(1);
-    }
-    10% {
-      transform: scale(0.9) rotate(-3deg);
-    }
-    20% {
-      transform: scale(0.9) rotate(-3deg);
-    }
-    30% {
-      transform: scale(1.1) rotate(3deg);
-    }
-    40% {
-      transform: scale(1.1) rotate(-3deg);
-    }
-    50% {
-      transform: scale(1.1) rotate(3deg);
-    }
-    60% {
-      transform: scale(1.1) rotate(-3deg);
-    }
-    70% {
-      transform: scale(1.1) rotate(3deg);
-    }
-    80% {
-      transform: scale(1.1) rotate(-3deg);
-    }
-    90% {
-      transform: scale(1.1) rotate(3deg);
-    }
-    100% {
-      transform: scale(1) rotate(0);
-    }
-  }
 }
 
+/* Apple-inspired container utilities with optimal reading widths */
 @utility container {
   margin-inline: auto;
-  padding-inline: 2rem;
-  @media (width >= --theme(--breakpoint-sm)) {
-    max-width: none;
+  padding-inline: var(--spacing-apple-md);
+  @media (width >= 640px) {
+    max-width: var(--max-width-apple-regular);
   }
-  @media (width >= 1400px) {
-    max-width: 1400px;
+  @media (width >= 768px) {
+    max-width: var(--max-width-apple-large);
+  }
+  @media (width >= 1024px) {
+    max-width: var(--max-width-apple-reading);
+    padding-inline: var(--spacing-apple-lg);
   }
 }
 
-/* Enhanced theme transition utilities for Tailwind v4 */
+/* Apple-inspired content container for optimal reading */
+@utility container-reading {
+  margin-inline: auto;
+  padding-inline: var(--spacing-apple-md);
+  max-width: var(--max-width-apple-reading);
+}
+
+/* Apple-inspired animation utilities */
+@utility animate-apple-bounce {
+  animation: var(--animate-apple-bounce);
+}
+
+@utility animate-apple-fade {
+  animation: var(--animate-apple-fade);
+}
+
+@utility animate-apple-slide {
+  animation: var(--animate-apple-slide);
+}
+
+@utility animate-hover-lift {
+  animation: var(--animate-hover-lift);
+}
+
+@utility animate-pulse-subtle {
+  animation: var(--animate-pulse-subtle);
+}
+
+/* Enhanced theme transition utilities */
 @utility bg-transition-theme {
   transition-property: background-color, background-image, backdrop-filter;
   transition-duration: var(--theme-transition-normal);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 @utility transition-theme {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
   transition-duration: var(--theme-transition-normal);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 @utility transition-theme-fast {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
   transition-duration: var(--theme-transition-fast);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 @utility transition-theme-slow {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
   transition-duration: var(--theme-transition-slow);
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Apple-inspired glass morphism */
+@utility glass-morphism {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+}
+
+@utility glass-morphism-dark {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
   looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
 */
 @layer base {
   *,
@@ -268,19 +292,12 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -330,6 +347,18 @@
 
   body {
     @apply bg-background text-foreground transition-theme;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Apple-inspired system font stack */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
   }
 
   /* Enhanced global theme transition support */
@@ -337,7 +366,17 @@
     @apply transition-theme;
   }
 
-  /* Improved transition for elements that should change more slowly during theme transitions */
+  /* Apple-inspired focus states */
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid rgba(0, 122, 255, 0.6);
+    outline-offset: 2px;
+    transition: outline-color 0.2s ease;
+  }
+
+  /* Improved transition for elements */
   .bg-transition-slow {
     transition-duration: var(--theme-transition-slow);
   }
@@ -347,7 +386,7 @@
   }
 }
 
-/* Tailwind v4 optimized gradients and animations */
+/* Apple-inspired utility classes */
 @layer utilities {
   .animate-gradient-shift {
     background-size: 200% 200%;
@@ -355,7 +394,87 @@
   }
   
   .backdrop-blur-theme {
-    backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
     transition: backdrop-filter var(--theme-transition-normal) ease;
+  }
+
+  /* Apple-inspired typography utilities */
+  .text-apple-caption {
+    font-size: var(--font-size-apple-caption);
+    line-height: 1.3;
+  }
+
+  .text-apple-footnote {
+    font-size: var(--font-size-apple-footnote);
+    line-height: 1.4;
+  }
+
+  .text-apple-body {
+    font-size: var(--font-size-apple-body);
+    line-height: 1.5;
+  }
+
+  .text-apple-headline {
+    font-size: var(--font-size-apple-headline);
+    line-height: 1.3;
+  }
+
+  .text-apple-title {
+    font-size: var(--font-size-apple-title);
+    line-height: 1.2;
+  }
+
+  .text-apple-large-title {
+    font-size: var(--font-size-apple-large-title);
+    line-height: 1.1;
+  }
+
+  /* Apple-inspired spacing utilities */
+  .space-apple-xs > * + * {
+    margin-top: var(--spacing-apple-xs);
+  }
+
+  .space-apple-sm > * + * {
+    margin-top: var(--spacing-apple-sm);
+  }
+
+  .space-apple-md > * + * {
+    margin-top: var(--spacing-apple-md);
+  }
+
+  .space-apple-lg > * + * {
+    margin-top: var(--spacing-apple-lg);
+  }
+
+  /* Apple-inspired hover effects */
+  .hover-lift {
+    transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Apple-inspired card styles */
+  .card-apple {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .card-apple:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 40px 0 rgba(0, 0, 0, 0.12);
+  }
+
+  .card-apple-dark {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.3);
   }
 }

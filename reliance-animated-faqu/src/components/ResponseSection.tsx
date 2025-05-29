@@ -107,6 +107,9 @@ const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md'; variant?: 'ghost'
     md: 'h-8 w-8'
   };
 
+  // Map custom sizes to Button component sizes
+  const buttonSize = size === 'sm' ? 'sm' : 'default';
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -693,11 +696,11 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
 
   return (
     <Card className={`w-full ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} relative`}>
-      <CardContent className="p-2 space-y-3">
+      <CardContent className="p-1 space-y-2">
         {/* Enhanced scrollable container with better styling */}
         <div 
           ref={scrollContainerRef}
-          className={`max-h-[calc(85vh-8rem)] overflow-y-auto space-y-3 px-4 py-2 ${
+          className={`max-h-[calc(85vh-8rem)] overflow-y-auto space-y-2 px-3 py-2 ${
             isDark 
               ? 'scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500' 
               : 'scrollbar-thin scrollbar-track-gray-200 scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-500'

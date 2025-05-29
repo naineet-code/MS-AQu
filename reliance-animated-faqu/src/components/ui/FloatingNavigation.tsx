@@ -27,15 +27,27 @@ export const FloatingNavigation = memo(function FloatingNavigation({
     console.log('FloatingNavigation re-rendered with theme:', theme);
   }, [theme]);
 
-  const containerClasses = `flex items-center gap-3 px-3 py-2 rounded-full shadow-xl border-2 transition-all duration-300 ${
+  const containerClasses = `flex items-center gap-3 px-4 py-3 rounded-full shadow-xl border-2 transition-all duration-300 ${
     isDark 
-      ? 'bg-gray-900/95 border-gray-600 backdrop-blur-md' 
-      : 'bg-white/95 border-gray-400 backdrop-blur-md shadow-lg'
+      ? 'bg-gray-900/95 border-gray-700 backdrop-blur-md' 
+      : 'bg-white/95 border-gray-300 backdrop-blur-md shadow-lg'
   }`;
 
-  const buttonBaseClasses = (baseColor: string) => `relative h-10 w-10 rounded-full transition-all duration-300 ${
-    isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-  } group transform hover:scale-110`;
+  const buttonBaseClasses = (baseColor: string) => {
+    const colorMap = {
+      blue: isDark 
+        ? 'bg-blue-900/40 border-blue-700/50 hover:bg-blue-800/60 hover:border-blue-600' 
+        : 'bg-blue-50/80 border-blue-200/60 hover:bg-blue-100 hover:border-blue-300',
+      purple: isDark 
+        ? 'bg-purple-900/40 border-purple-700/50 hover:bg-purple-800/60 hover:border-purple-600' 
+        : 'bg-purple-50/80 border-purple-200/60 hover:bg-purple-100 hover:border-purple-300',
+      emerald: isDark 
+        ? 'bg-emerald-900/40 border-emerald-700/50 hover:bg-emerald-800/60 hover:border-emerald-600' 
+        : 'bg-emerald-50/80 border-emerald-200/60 hover:bg-emerald-100 hover:border-emerald-300'
+    };
+    
+    return `relative h-12 w-12 rounded-full border-2 transition-all duration-300 ${colorMap[baseColor as keyof typeof colorMap]} group transform hover:scale-110 shadow-md`;
+  };
 
   return (
     <div 
@@ -49,8 +61,6 @@ export const FloatingNavigation = memo(function FloatingNavigation({
           <TooltipTrigger asChild>
             <Button
               key={`pdf-btn-${theme}`}
-              size="icon"
-              variant="ghost"
               aria-label="View PDF (Ctrl+P)"
               onClick={onPdfClick}
               disabled={!isOnline}
@@ -58,7 +68,7 @@ export const FloatingNavigation = memo(function FloatingNavigation({
               data-theme={theme}
             >
               <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <FileText className={`h-5 w-5 transition-transform duration-300 group-hover:rotate-3 ${
+              <FileText className={`h-6 w-6 transition-transform duration-300 group-hover:rotate-3 ${
                 isDark ? 'text-blue-400' : 'text-blue-500'
               }`} />
               {connectionStatus === 'connected' && (
@@ -81,15 +91,13 @@ export const FloatingNavigation = memo(function FloatingNavigation({
           <TooltipTrigger asChild>
             <Button
               key={`ai-btn-${theme}`}
-              size="icon"
-              variant="ghost"
               aria-label="AI System Information (Ctrl+I)"
               onClick={onAiInfoClick}
               className={buttonBaseClasses('purple')}
               data-theme={theme}
             >
               <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <Brain className={`h-5 w-5 transition-transform duration-300 group-hover:-rotate-3 ${
+              <Brain className={`h-6 w-6 transition-transform duration-300 group-hover:-rotate-3 ${
                 isDark ? 'text-purple-400' : 'text-purple-500'
               }`} />
             </Button>
@@ -107,15 +115,13 @@ export const FloatingNavigation = memo(function FloatingNavigation({
           <TooltipTrigger asChild>
             <Button
               key={`help-btn-${theme}`}
-              size="icon"
-              variant="ghost"
               aria-label="Help & How to Use (Ctrl+H)"
               onClick={onHelpClick}
               className={buttonBaseClasses('emerald')}
               data-theme={theme}
             >
               <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <HelpCircle className={`h-5 w-5 transition-transform duration-300 group-hover:rotate-3 ${
+              <HelpCircle className={`h-6 w-6 transition-transform duration-300 group-hover:rotate-3 ${
                 isDark ? 'text-emerald-400' : 'text-emerald-500'
               }`} />
             </Button>

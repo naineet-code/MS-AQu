@@ -17,7 +17,7 @@ interface UseChatStateReturn {
   isTransitioning: boolean;
   setIsTransitioning: (transitioning: boolean) => void;
   handleAddMessage: (message: string, isUser: boolean) => void;
-  handleNewQuestion: () => void;
+  handleNewQuestion: (clearResponseData?: () => void) => void;
 }
 
 export const useChatState = (): UseChatStateReturn => {
@@ -49,7 +49,7 @@ export const useChatState = (): UseChatStateReturn => {
   };
 
   // Handle going back to question mode
-  const handleNewQuestion = () => {
+  const handleNewQuestion = (clearResponseData?: () => void) => {
     setQuestionMode(true);
     setShowResponse(false);
     setShouldAutoFocus(false);
@@ -64,6 +64,10 @@ export const useChatState = (): UseChatStateReturn => {
       }
       setIsTransitioning(false);
     }, 700);
+
+    if (clearResponseData) {
+      clearResponseData();
+    }
   };
 
   return {

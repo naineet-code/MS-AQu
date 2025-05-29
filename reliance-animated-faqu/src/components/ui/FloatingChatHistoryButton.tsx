@@ -23,13 +23,15 @@ export const FloatingChatHistoryButton = memo(function FloatingChatHistoryButton
 
   const containerClasses = `flex items-center justify-center h-14 w-14 rounded-full shadow-xl border-2 transition-all duration-300 ${
     isDark 
-      ? 'bg-gray-900/95 border-gray-600 backdrop-blur-md' 
-      : 'bg-white/95 border-gray-400 backdrop-blur-md shadow-lg'
+      ? 'bg-gray-900/95 border-gray-700 backdrop-blur-md' 
+      : 'bg-white/95 border-gray-300 backdrop-blur-md shadow-lg'
   }`;
 
-  const buttonClasses = `relative h-10 w-10 rounded-full transition-all duration-300 ${
-    isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-  } group transform hover:scale-110`;
+  const buttonClasses = `relative h-12 w-12 rounded-full border-2 transition-all duration-300 ${
+    isDark 
+      ? 'bg-blue-900/40 border-blue-700/50 hover:bg-blue-800/60 hover:border-blue-600' 
+      : 'bg-blue-50/80 border-blue-200/60 hover:bg-blue-100 hover:border-blue-300'
+  } group transform hover:scale-110 shadow-md`;
 
   return (
     <div 
@@ -42,8 +44,6 @@ export const FloatingChatHistoryButton = memo(function FloatingChatHistoryButton
           <TooltipTrigger asChild>
             <Button
               key={`chat-btn-${theme}`}
-              size="icon"
-              variant="ghost"
               aria-label="Chat History (Ctrl+J)"
               onClick={onClick}
               className={buttonClasses}

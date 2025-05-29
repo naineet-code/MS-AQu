@@ -8,7 +8,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogClose } from "
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 // PDF and control icons
-import { FileText, X, ExternalLink, RotateCcw, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2, Brain } from "lucide-react";
+import { FileText, X, ExternalLink, RotateCcw, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2, Brain, Terminal, Lightbulb } from "lucide-react";
 import ChatHistory from "./ChatHistory";
 import { useChatHistory } from "@/hooks/useChatHistory";
 import { useTheme } from "@/hooks/useTheme";
@@ -17,7 +17,8 @@ import { marked } from 'marked';
 import { aiFormatter } from '@/utils/aiFormatter';
 import HelpScreen from "./HelpScreen";
 import { loadBackendUrl } from "@/config";
-import { AIInfoSection } from './AIInfoSection';
+import { TechnicalInfoSection } from './TechnicalInfoSection';
+import { BusinessGuideSection } from './BusinessGuideSection';
 import { useChatState } from '@/hooks/useChatState';
 import { usePdfDialog } from '@/hooks/usePdfDialog';
 import { getRandomInitSteps } from '@/data/initializationSteps';
@@ -78,7 +79,10 @@ export default function FAQPage() {
   const [showHelpScreen, setShowHelpScreen] = useState(false);
   const [backendUrl, setBackendUrl] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
-  const [showAIInfo, setShowAIInfo] = useState(false);
+  
+  // New section states
+  const [showTechnicalInfo, setShowTechnicalInfo] = useState(false);
+  const [showBusinessGuide, setShowBusinessGuide] = useState(false);
 
   // Global click handler to reset chat position when clicking outside
   useEffect(() => {
@@ -219,9 +223,9 @@ export default function FAQPage() {
         */}
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 pb-12 relative z-10 pointer-events-none">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 pb-8 relative z-10 pointer-events-none">
           <PageTitle isVisible={!isInputFocused && questionMode && !isReturnedFromResponse} />
-          <div className="w-full max-w-3xl mx-auto space-y-6 pointer-events-auto">
+          <div className="w-full container-reading mx-auto space-y-4 pointer-events-auto">
             <AnimatePresence mode="wait">
               {questionMode ? (
                 <motion.div
@@ -229,7 +233,10 @@ export default function FAQPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }}
                 >
                   <div data-chat-container>
                     <ChatInputSection
@@ -253,14 +260,17 @@ export default function FAQPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }}
                 >
                   <QuestionResponseSection
                     question={currentQuestion}
                     isVisible={showResponse}
-                    responseData={responseData}
+                    onNewQuestion={() => handleNewQuestion(() => setResponseData(null))}
                     loading={loading}
-                    onNewQuestion={handleNewQuestion}
+                    responseData={responseData}
                     backendUrl={backendUrl}
                   />
                 </motion.div>
@@ -268,247 +278,390 @@ export default function FAQPage() {
             </AnimatePresence>
           </div>
         </div>
-      </div>
 
-      {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-20 left-4 z-20">
-        <div className="flex items-center gap-4 px-4 py-2 rounded-full bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg">
-          {/* PDF Viewer Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="View PDF"
-                onClick={() => {
-                  setShowPdfDialog(true);
-                  setPdfError("");
-                }}
-                className="relative h-10 w-10 rounded-full transition-all duration-300 hover:bg-white/10 dark:hover:bg-white/5 group transform hover:animate-hover-tada"
-              >
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-shimmer" />
-                <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>View PDF Document</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* AI Info Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="AI System Information"
-                onClick={() => setShowAIInfo(true)}
-                className="relative h-10 w-10 rounded-full transition-all duration-300 hover:bg-white/10 dark:hover:bg-white/5 group transform hover:animate-hover-tada"
-              >
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-shimmer" />
-                <Brain className="h-5 w-5 text-purple-500 dark:text-purple-400 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>AQu Intelligent Engine</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Help Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="Help & How to Use"
-                onClick={() => setShowHelpScreen(true)}
-                className="relative h-10 w-10 rounded-full transition-all duration-300 hover:bg-white/10 dark:hover:bg-white/5 group transform hover:animate-hover-tada"
-              >
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-shimmer" />
-                <HelpCircle className="h-5 w-5 text-emerald-500 dark:text-emerald-400 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Help & How to Use</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
-      {/* Chat History Button */}
-      <div className="fixed bottom-20 right-4 z-20">
-        <div className="flex items-center justify-center h-14 w-14 rounded-full bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="Chat History"
-                onClick={() => setShowChatHistory(!showChatHistory)}
-                className="relative h-10 w-10 rounded-full transition-all duration-300 hover:bg-white/10 dark:hover:bg-white/5 group transform hover:animate-hover-tada"
-              >
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-shimmer" />
-                <History className="h-5 w-5 text-blue-500 dark:text-blue-400 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Chat History</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 z-10">
-        <div className={`w-full py-2 px-4 text-center text-xs border-t backdrop-blur-sm ${
-          isDark 
-            ? 'bg-black/20 border-white/10 text-gray-400' 
-            : 'bg-white/20 border-black/10 text-gray-600'
-        }`}>
-          <p className="flex items-center justify-center gap-1">
-            Powered by 
-            <span className={`font-semibold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-              Increff AQu AI Service
-            </span>
-            <span className="mx-1">•</span>
-            <span className="text-[10px]">
-              © 2025 Increff Technologies Pvt. Ltd.
-            </span>
-          </p>
-        </div>
-      </footer>
-
-      {/* Help Screen */}
-      {showHelpScreen && (
-        <HelpScreen 
-          isOpen={showHelpScreen} 
-          onClose={() => setShowHelpScreen(false)} 
-        />
-      )}
-
-      {/* AI Info Dialog */}
-      {showAIInfo && (
-        <AIInfoSection isOpen={showAIInfo} onClose={() => setShowAIInfo(false)} />
-      )}
-
-      {/* PDF Viewer Dialog */}
-      {showPdfDialog && (
-        <Dialog open={showPdfDialog} onOpenChange={setShowPdfDialog}>
-          <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] p-0 gap-0 transition-all duration-300">
-            {/* Header with Title and Controls */}
-            <div className="relative flex items-center py-2 px-4 rounded-t-lg shadow-sm border-b bg-white/70 dark:bg-gray-900/70 backdrop-blur-md min-h-0">
-              <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400 mr-2" />
-              <DialogTitle className="text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 flex-1">
-                PDF Document Viewer
-              </DialogTitle>
-              <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Reset PDF View"
-                      onClick={() => {
-                        const iframe = document.querySelector('iframe');
-                        if (iframe) {
-                          iframe.src = `${backendUrl}/pdf/reliance/reliance_faq.pdf`;
+        {/* Apple-inspired Bottom Navigation */}
+        <AnimatePresence>
+          {!isInputFocused && questionMode && !isReturnedFromResponse && (
+          <motion.div 
+            key="bottom-navigation"
+            className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-20"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="flex items-center gap-3 px-8 py-2 rounded-full glass-morphism shadow-lg hover-lift">
+              {/* PDF Viewer Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="View PDF"
+                    onClick={() => {
+                      setShowPdfDialog(true);
+                      setPdfError("");
+                    }}
+                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
+                  >
+                    <motion.div
+                      whileHover={{ 
+                        scale: [1, 1.3, 1.1, 1.3, 1], 
+                        rotate: [0, -10, 10, -10, 0],
+                        transition: { 
+                          duration: 0.6, 
+                          ease: "easeInOut",
+                          times: [0, 0.2, 0.4, 0.6, 1]
                         }
                       }}
-                      className="h-8 w-8 rounded-full hover:bg-blue-100/60 dark:hover:bg-blue-900/40 flex items-center justify-center"
-                    >
-                      <RotateCcw className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Reset PDF View</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Open in Tab"
-                      onClick={() => {
-                        window.open(`${backendUrl}/pdf/reliance/reliance_faq.pdf`, '_blank');
+                      whileTap={{ scale: 0.95 }}
+                      animate={{ 
+                        scale: [1, 1.05, 1],
+                        rotate: [0, 2, -2, 0]
                       }}
-                      className="h-8 w-8 rounded-full hover:bg-green-100/60 dark:hover:bg-green-900/40 flex items-center justify-center"
+                      transition={{ 
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        repeatDelay: 2
+                      }}
                     >
-                      <ExternalLink className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Open in Tab</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DialogClose asChild>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        aria-label="Close PDF Viewer" 
-                        className="h-8 w-8 rounded-full hover:bg-red-100/60 dark:hover:bg-red-900/40 flex items-center justify-center"
+                      <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </motion.div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-apple-footnote">
+                  <p>View Documents</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Separator */}
+              <div className="w-px h-5 bg-white/20 dark:bg-white/10 mx-1" />
+
+              {/* Technical Info Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Technical Deep Dive"
+                    onClick={() => setShowTechnicalInfo(true)}
+                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
+                  >
+                    <motion.div
+                      whileHover={{ 
+                        scale: [1, 1.3, 1.1, 1.3, 1], 
+                        rotate: [0, -10, 10, -10, 0],
+                        transition: { 
+                          duration: 0.6, 
+                          ease: "easeInOut",
+                          times: [0, 0.2, 0.4, 0.6, 1]
+                        }
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      animate={{ 
+                        scale: [1, 1.05, 1],
+                        rotate: [0, 3, -3, 0]
+                      }}
+                      transition={{ 
+                        duration: 3.5,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        repeatDelay: 2.5
+                      }}
+                    >
+                      <Terminal className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </motion.div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-apple-footnote">
+                  <p>Technical Guide</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* User Guide Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="User Guide"
+                    onClick={() => setShowBusinessGuide(true)}
+                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
+                  >
+                    <motion.div
+                      whileHover={{ 
+                        scale: [1, 1.3, 1.1, 1.3, 1], 
+                        rotate: [0, -10, 10, -10, 0],
+                        transition: { 
+                          duration: 0.6, 
+                          ease: "easeInOut",
+                          times: [0, 0.2, 0.4, 0.6, 1]
+                        }
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      animate={{ 
+                        scale: [1, 1.05, 1],
+                        rotate: [0, -2, 2, 0]
+                      }}
+                      transition={{ 
+                        duration: 4,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        repeatDelay: 3
+                      }}
+                    >
+                      <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </motion.div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-apple-footnote">
+                  <p>User Guide</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Separator */}
+              <div className="w-px h-5 bg-white/20 dark:bg-white/10 mx-1" />
+
+              {/* Chat History Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Chat History"
+                    onClick={() => setShowChatHistory(!showChatHistory)}
+                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
+                  >
+                    <motion.div
+                      whileHover={{ 
+                        scale: [1, 1.3, 1.1, 1.3, 1], 
+                        rotate: [0, -10, 10, -10, 0],
+                        transition: { 
+                          duration: 0.6, 
+                          ease: "easeInOut",
+                          times: [0, 0.2, 0.4, 0.6, 1]
+                        }
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      animate={{ 
+                        scale: [1, 1.05, 1],
+                        rotate: [0, 1, -1, 0]
+                      }}
+                      transition={{ 
+                        duration: 4.5,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        repeatDelay: 3.5
+                      }}
+                    >
+                      <History className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                    </motion.div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-apple-footnote">
+                  <p>Chat History</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Apple-inspired Footer */}
+        <AnimatePresence>
+          {!isInputFocused && questionMode && !isReturnedFromResponse && (
+          <motion.footer 
+            key="footer"
+            className="fixed bottom-0 left-0 right-0 z-10"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className={`w-full py-3 px-6 text-center backdrop-blur-md border-t ${
+              isDark 
+                ? 'bg-black/20 border-white/10' 
+                : 'bg-white/40 border-white/30'
+            }`}>
+              <p className="flex items-center justify-center gap-2 text-apple-footnote">
+                <span className="text-slate-500 dark:text-slate-400">Powered by</span>
+                <span className={`font-semibold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                  Increff AQu AI Service
+                </span>
+                <span className="text-slate-400 dark:text-slate-500">•</span>
+                <span className="text-apple-caption text-slate-400 dark:text-slate-500">
+                  © 2025 Increff Technologies
+                </span>
+              </p>
+            </div>
+          </motion.footer>
+          )}
+        </AnimatePresence>
+
+        {/* Help Screen */}
+        {showHelpScreen && (
+          <HelpScreen 
+            isOpen={showHelpScreen} 
+            onClose={() => setShowHelpScreen(false)} 
+          />
+        )}
+
+        {/* Technical Deep Dive Section */}
+        {showTechnicalInfo && (
+          <TechnicalInfoSection 
+            isOpen={showTechnicalInfo} 
+            onClose={() => setShowTechnicalInfo(false)} 
+          />
+        )}
+
+        {/* User Guide Section */}
+        {showBusinessGuide && (
+          <BusinessGuideSection 
+            isOpen={showBusinessGuide} 
+            onClose={() => setShowBusinessGuide(false)} 
+          />
+        )}
+
+        {/* PDF Viewer Dialog */}
+        {showPdfDialog && (
+          <Dialog open={showPdfDialog} onOpenChange={setShowPdfDialog}>
+            <DialogContent className="max-w-4xl w-[88vw] max-h-[88vh] p-0 gap-0 transition-all duration-300 rounded-3xl overflow-hidden">
+              {/* Apple-inspired Header */}
+              <div className="relative flex items-center py-4 px-6 border-b glass-morphism shadow-sm">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900">
+                    <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-apple-headline font-bold text-gray-900 dark:text-gray-100">
+                      Document Viewer
+                    </DialogTitle>
+                    <p className="text-apple-footnote text-gray-600 dark:text-gray-400">
+                      AQu Knowledge Base
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-label="Reset PDF View"
+                        onClick={() => {
+                          const iframe = document.querySelector('iframe');
+                          if (iframe) {
+                            iframe.src = `${backendUrl}/pdf/reliance/reliance_faq.pdf`;
+                          }
+                        }}
+                        className="p-1 transition-all duration-200 hover:scale-110 focus:outline-none"
                       >
-                        <X className="h-5 w-5" />
-                      </Button>
-                    </DialogClose>
-                  </TooltipTrigger>
-                  <TooltipContent>Close</TooltipContent>
-                </Tooltip>
+                        <RotateCcw className="h-5 w-5 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-apple-footnote">Reset View</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        aria-label="Open in Tab"
+                        onClick={() => {
+                          window.open(`${backendUrl}/pdf/reliance/reliance_faq.pdf`, '_blank');
+                        }}
+                        className="p-1 transition-all duration-200 hover:scale-110 focus:outline-none"
+                      >
+                        <ExternalLink className="h-5 w-5 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors duration-200" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-apple-footnote">Open in Tab</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DialogClose asChild>
+                        <button 
+                          aria-label="Close PDF Viewer" 
+                          className="p-1 transition-all duration-200 hover:scale-110 focus:outline-none"
+                        >
+                          <X className="h-5 w-5 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200" />
+                        </button>
+                      </DialogClose>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-apple-footnote">Close</TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
-            </div>
 
-            {/* PDF Content */}
-            <div className="h-[70vh] overflow-y-auto p-6 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-              {pdfLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500 dark:text-blue-400" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading PDF...</p>
-                  </div>
-                </div>
-              ) : pdfError ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center p-4">
-                    <p className="text-red-500 dark:text-red-400 mb-2">{pdfError}</p>
-                    <Button 
-                      onClick={() => setShowPdfDialog(false)}
-                      className="hover:bg-white/10 dark:hover:bg-white/5"
+              {/* PDF Content */}
+              <div className="h-[75vh] overflow-hidden bg-gray-50 dark:bg-gray-900">
+                {pdfLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <motion.div 
+                      className="flex flex-col items-center gap-4"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
                     >
-                      Close
-                    </Button>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Loader2 className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                      </motion.div>
+                      <p className="text-apple-body text-gray-600 dark:text-gray-400 font-medium">
+                        Loading Document...
+                      </p>
+                    </motion.div>
                   </div>
-                </div>
-              ) : (
-                <iframe
-                  src={`${backendUrl}/pdf/reliance/reliance_faq.pdf`}
-                  className="w-full h-full rounded-xl border border-white/10 shadow-lg"
-                  title="PDF Document"
-                  onLoad={handlePdfLoad}
-                  onError={handlePdfError}
-                />
-              )}
+                ) : pdfError ? (
+                  <div className="flex items-center justify-center h-full">
+                    <motion.div 
+                      className="text-center p-8 max-w-md"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="p-4 rounded-full bg-red-100 dark:bg-red-900 w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                        <X className="h-8 w-8 text-red-600 dark:text-red-400" />
+                      </div>
+                      <p className="text-apple-body text-red-600 dark:text-red-400 mb-4 font-medium">
+                        {pdfError}
+                      </p>
+                      <Button 
+                        onClick={() => setShowPdfDialog(false)}
+                        className="rounded-full px-6 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-700 dark:text-red-300 border-0 transition-all duration-200"
+                      >
+                        Close
+                      </Button>
+                    </motion.div>
+                  </div>
+                ) : (
+                  <motion.iframe
+                    src={`${backendUrl}/pdf/reliance/reliance_faq.pdf`}
+                    className="w-full h-full border-0 bg-white dark:bg-gray-800"
+                    title="PDF Document"
+                    onLoad={handlePdfLoad}
+                    onError={handlePdfError}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                  />
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Error Toast */}
+        {error && (
+          <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+            <div className={`px-4 py-2 rounded-lg shadow-lg ${
+              isDark ? 'bg-red-900/90 text-red-100' : 'bg-red-100/90 text-red-900'
+            }`}>
+              <p className="text-sm font-medium">{error}</p>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Error Toast */}
-      {error && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
-          <div className={`px-4 py-2 rounded-lg shadow-lg ${
-            isDark ? 'bg-red-900/90 text-red-100' : 'bg-red-100/90 text-red-900'
-          }`}>
-            <p className="text-sm font-medium">{error}</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Chat History */}
-      {showChatHistory && (
-        <ChatHistory
-          messages={chatHistory}
-          onClear={clearHistory}
-          onClose={() => setShowChatHistory(false)}
-        />
-      )}
+        {/* Chat History */}
+        {showChatHistory && (
+          <ChatHistory
+            messages={chatHistory}
+            onClear={clearHistory}
+            onClose={() => setShowChatHistory(false)}
+          />
+        )}
+      </div>
     </TooltipProvider>
   );
 }
