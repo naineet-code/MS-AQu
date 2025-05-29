@@ -1,46 +1,50 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 type Theme = 'light' | 'dark';
 
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Check for stored theme preference or use system preference
+    // Simple initial theme detection
     if (typeof window !== 'undefined') {
       const storedTheme = localStorage.getItem('theme') as Theme;
-      if (storedTheme) {
+      if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
         return storedTheme;
       }
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    return 'light'; // Default fallback
+    return 'light';
   });
 
-  useEffect(() => {
+  // Simple theme application
+  const applyTheme = useCallback((newTheme: Theme) => {
     const root = window.document.documentElement;
-    const transitionAll = () => {
-      document.documentElement.classList.add('transition-colors');
-      document.documentElement.classList.add('duration-300');
-    };
     
-    transitionAll();
-    
-    if (theme === 'dark') {
+    // Apply theme classes
+    if (newTheme === 'dark') {
       root.classList.add('dark');
+      root.classList.remove('light');
     } else {
       root.classList.remove('dark');
+      root.classList.add('light');
     }
     
-    // Save preference to localStorage
-    localStorage.setItem('theme', theme);
+    // Store theme preference
+    localStorage.setItem('theme', newTheme);
+  }, []);
 
-    // Force a small reflow to ensure transitions apply correctly
-    document.body.offsetHeight;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    applyTheme(theme);
+  }, [theme, applyTheme]);
+
+  // Simple toggle function
+  const toggleTheme = useCallback(() => {
+    const newTheme: Theme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  return { 
+    theme, 
+    toggleTheme
   };
-
-  return { theme, toggleTheme };
 }

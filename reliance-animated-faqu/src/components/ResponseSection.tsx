@@ -555,7 +555,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
 
   return (
     <Card className={`w-full ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-      <CardContent className="p-6 space-y-6">
+      <CardContent className="p-6 space-y-6 max-h-[calc(90vh-12rem)] overflow-y-auto">
         {/* Answer Section */}
         <Collapsible
           open={expandedSections.answer}

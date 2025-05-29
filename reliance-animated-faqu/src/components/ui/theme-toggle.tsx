@@ -4,36 +4,15 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
-// Create a simple event system to communicate theme changes
-export const themeChangeEvent = new EventTarget();
-export const THEME_CHANGE_EVENT = "themeChanged";
-
 export const ThemeToggle = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement>
->((props, ref) => {
+>(({ onClick, ...props }, ref) => {
   const { theme, toggleTheme } = useTheme();
 
-  const handleToggle = () => {
-    // Toggle theme
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     toggleTheme();
-    
-    // Update background immediately
-    const root = window.document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    
-    // Force a re-render of the background animation
-    const event = new CustomEvent(THEME_CHANGE_EVENT, { 
-      detail: { 
-        theme: theme === 'light' ? 'dark' : 'light',
-        timestamp: Date.now() // Add timestamp to force re-render
-      } 
-    });
-    themeChangeEvent.dispatchEvent(event);
+    onClick?.(e);
   };
 
   return (
@@ -43,15 +22,15 @@ export const ThemeToggle = React.forwardRef<
           ref={ref}
           variant="ghost"
           size="icon"
-          onClick={handleToggle}
-          className="rounded-full backdrop-blur-sm border transform transition-transform duration-300 ease-in-out hover:animate-hover-tada"
+          onClick={handleClick}
+          className="rounded-full backdrop-blur-sm border"
           aria-label="Toggle theme"
           {...props}
         >
           {theme === 'light' ? (
-            <Moon className="h-5 w-5 hover:animate-spin" />
+            <Moon className="h-5 w-5" />
           ) : (
-            <Sun className="h-5 w-5 hover:animate-spin" />
+            <Sun className="h-5 w-5" />
           )}
         </Button>
       </TooltipTrigger>

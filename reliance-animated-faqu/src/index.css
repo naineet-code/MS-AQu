@@ -1,6 +1,239 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-first: first 30s infinite;
+  --animate-second: second 30s infinite;
+  --animate-third: third 30s infinite;
+  --animate-fourth: fourth 30s infinite;
+  --animate-fifth: fifth 30s infinite;
+  --animate-gradient: gradient 3s ease infinite;
+  --animate-hover-tada: hover-tada 1s ease-in-out;
+
+  /* Enhanced theme transition durations for Tailwind v4 */
+  --theme-transition-fast: 300ms;
+  --theme-transition-normal: 700ms;
+  --theme-transition-slow: 1000ms;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  @keyframes first {
+    0%,
+    16.667%,
+    100% {
+      opacity: 1;
+    }
+    33.333%,
+    83.333% {
+      opacity: 0;
+    }
+  }
+  @keyframes second {
+    0%,
+    16.667%,
+    66.667%,
+    100% {
+      opacity: 0;
+    }
+    33.333%,
+    50% {
+      opacity: 1;
+    }
+  }
+  @keyframes third {
+    0%,
+    50%,
+    100% {
+      opacity: 0;
+    }
+    66.667%,
+    83.333% {
+      opacity: 1;
+    }
+  }
+  @keyframes fourth {
+    0%,
+    50%,
+    100% {
+      opacity: 0;
+    }
+    66.667%,
+    83.333% {
+      opacity: 1;
+    }
+  }
+  @keyframes fifth {
+    0%,
+    83.333%,
+    100% {
+      opacity: 0;
+    }
+    16.667%,
+    33.333% {
+      opacity: 1;
+    }
+  }
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  @keyframes hover-tada {
+    0% {
+      transform: scale(1);
+    }
+    10% {
+      transform: scale(0.9) rotate(-3deg);
+    }
+    20% {
+      transform: scale(0.9) rotate(-3deg);
+    }
+    30% {
+      transform: scale(1.1) rotate(3deg);
+    }
+    40% {
+      transform: scale(1.1) rotate(-3deg);
+    }
+    50% {
+      transform: scale(1.1) rotate(3deg);
+    }
+    60% {
+      transform: scale(1.1) rotate(-3deg);
+    }
+    70% {
+      transform: scale(1.1) rotate(3deg);
+    }
+    80% {
+      transform: scale(1.1) rotate(-3deg);
+    }
+    90% {
+      transform: scale(1.1) rotate(3deg);
+    }
+    100% {
+      transform: scale(1) rotate(0);
+    }
+  }
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+/* Enhanced theme transition utilities for Tailwind v4 */
+@utility bg-transition-theme {
+  transition-property: background-color, background-image, backdrop-filter;
+  transition-duration: var(--theme-transition-normal);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility transition-theme {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
+  transition-duration: var(--theme-transition-normal);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility transition-theme-fast {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
+  transition-duration: var(--theme-transition-fast);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility transition-theme-slow {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, background-image;
+  transition-duration: var(--theme-transition-slow);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 @layer base {
   :root {
@@ -51,11 +284,6 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  &.transition-colors {
-    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -101,11 +329,33 @@
   }
 
   body {
-    @apply bg-background text-foreground transition-colors duration-300;
+    @apply bg-background text-foreground transition-theme;
   }
 
-  /* Override default transition duration for elements that should change more slowly */
+  /* Enhanced global theme transition support */
+  html {
+    @apply transition-theme;
+  }
+
+  /* Improved transition for elements that should change more slowly during theme transitions */
   .bg-transition-slow {
-    transition-duration: 700ms;
+    transition-duration: var(--theme-transition-slow);
+  }
+  
+  .bg-transition-fast {
+    transition-duration: var(--theme-transition-fast);
+  }
+}
+
+/* Tailwind v4 optimized gradients and animations */
+@layer utilities {
+  .animate-gradient-shift {
+    background-size: 200% 200%;
+    animation: gradient 3s ease infinite;
+  }
+  
+  .backdrop-blur-theme {
+    backdrop-filter: blur(12px) saturate(180%);
+    transition: backdrop-filter var(--theme-transition-normal) ease;
   }
 }

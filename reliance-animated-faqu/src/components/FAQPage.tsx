@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 // PDF and control icons
 import { FileText, X, ExternalLink, RotateCcw, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2, Brain } from "lucide-react";
-import { ThemeToggle, themeChangeEvent, THEME_CHANGE_EVENT } from "@/components/ui/theme-toggle";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import ChatHistory from "./ChatHistory";
 import { useChatHistory } from "@/hooks/useChatHistory";
 import { useTheme } from "@/hooks/useTheme";
@@ -23,6 +23,7 @@ import { useChatState } from '@/hooks/useChatState';
 import { usePdfDialog } from '@/hooks/usePdfDialog';
 import { getRandomInitSteps } from '@/data/initializationSteps';
 import { useBackendApi } from '@/hooks/useBackendApi';
+import { useLoaderControl } from '@/hooks/useLoaderControl';
 
 export default function FAQPage() {
   const {
@@ -65,33 +66,20 @@ export default function FAQPage() {
     handleSubmitQuestion
   } = useBackendApi();
 
+  const { shouldShowLoader, temporarilyDisableLoader } = useLoaderControl();
   const { chatHistory, clearHistory } = useChatHistory();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  
+  // Simple initialization state
   const [isInitializing, setIsInitializing] = useState(true);
   const [initializationSteps] = useState(getRandomInitSteps());
   const [showHelpScreen, setShowHelpScreen] = useState(false);
   const [backendUrl, setBackendUrl] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [showAIInfo, setShowAIInfo] = useState(false);
-  const [animationKey, setAnimationKey] = useState(Date.now());
-
-  // Handle theme changes and background animation refresh
-  useEffect(() => {
-    const handleThemeChange = (event: CustomEvent) => {
-      setAnimationKey(event.detail.timestamp);
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    };
-    
-    themeChangeEvent.addEventListener(THEME_CHANGE_EVENT, handleThemeChange as EventListener);
-    return () => {
-      themeChangeEvent.removeEventListener(THEME_CHANGE_EVENT, handleThemeChange as EventListener);
-    };
-  }, []);
 
   // Global click handler to reset chat position when clicking outside
   useEffect(() => {
@@ -112,9 +100,9 @@ export default function FAQPage() {
     return () => document.removeEventListener('click', handleGlobalClick);
   }, [isReturnedFromResponse, isInputFocused]);
 
-  // Always request loading of the single system PDF with initialization loader
+  // Simple initialization logic
   useEffect(() => {
-    // Set a maximum initialization time of 3 seconds regardless of backend status
+    // Set a maximum initialization time of 3 seconds
     const maxInitTime = setTimeout(() => {
       setIsInitializing(false);
     }, 3000);
@@ -130,7 +118,7 @@ export default function FAQPage() {
       } catch (err) {
         console.error('Error loading PDF:', err);
       } finally {
-        // Always finish initialization after a short delay, regardless of backend status
+        // Always finish initialization after a short delay
         setTimeout(() => {
           setIsInitializing(false);
           clearTimeout(maxInitTime);
@@ -150,7 +138,6 @@ export default function FAQPage() {
   useEffect(() => {
     loadBackendUrl()
       .then((url) => {
-        console.log('🔗 Backend URL loaded:', url);
         setBackendUrl(url);
       })
       .catch((err) => {
@@ -166,70 +153,69 @@ export default function FAQPage() {
   // Safety fallback - ensure app always loads within 5 seconds maximum
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
-      console.log('Safety timeout triggered - forcing app to load');
       setIsInitializing(false);
     }, 5000);
 
     return () => clearTimeout(safetyTimeout);
   }, []);
 
+  // Handle theme change to prevent loader
+  const handleThemeChange = () => {
+    temporarilyDisableLoader();
+  };
+
   /**
    * Submit question to backend and set response data
    */
   const handleQuestionSubmit = async (question: string) => {
-    console.log('📝 handleQuestionSubmit called with question:', question);
-    
     await handleSubmitQuestion(question, backendUrl);
     
-    console.log('📊 After handleSubmitQuestion - error:', error, 'responseData:', responseData);
-    
     if (!error && responseData && responseData.answer) {
-      console.log('✅ Response received successfully, setting up UI');
       setShowResponse(true);
       setQuestionMode(false);
       handleAddMessage(question, true);
       handleAddMessage(responseData.answer, false);
-      console.log('✅ UI state updated successfully');
     } else {
-      console.log('❌ Error or no response data:', { error, responseData });
       const errorMessage = error || 'Sorry, I encountered an error while processing your question. Please try again.';
       handleAddMessage(errorMessage, false);
     }
   };
 
+  // Only show loader if both conditions are met: initializing AND shouldShowLoader
+  const showLoader = isInitializing && shouldShowLoader;
+
   return (
     <TooltipProvider>
       <MultiStepLoader 
         loadingStates={initializationSteps} 
-        loading={isInitializing} 
+        loading={showLoader} 
         duration={1000}
         loop={false}
       />
       <div className="relative min-h-screen flex flex-col">
         {/* Fixed Background */}
-        <div className="fixed inset-0 z-0 transition-colors duration-700">
+        <div className="fixed inset-0 z-0">
           <BackgroundGradientAnimation
-            key={animationKey}
-            gradientBackgroundStart={isDark ? "rgb(13, 13, 13)" : "rgb(240, 240, 240)"}
-            gradientBackgroundEnd={isDark ? "rgb(30, 41, 59)" : "rgb(220, 230, 240)"}
-            firstColor={isDark ? "59, 130, 246" : "59, 130, 246"}
-            secondColor={isDark ? "147, 51, 234" : "120, 51, 234"}
-            thirdColor={isDark ? "236, 72, 153" : "236, 72, 153"}
-            fourthColor={isDark ? "248, 113, 113" : "230, 113, 113"}
-            fifthColor={isDark ? "34, 197, 94" : "34, 180, 94"}
-            pointerColor={isDark ? "99, 102, 241" : "79, 82, 221"}
+            gradientBackgroundStart={isDark ? "rgb(13, 13, 13)" : "rgb(250, 250, 250)"}
+            gradientBackgroundEnd={isDark ? "rgb(30, 41, 59)" : "rgb(200, 220, 240)"}
+            firstColor={isDark ? "59, 130, 246" : "99, 102, 241"}
+            secondColor={isDark ? "147, 51, 234" : "59, 130, 246"}
+            thirdColor={isDark ? "236, 72, 153" : "168, 85, 247"}
+            fourthColor={isDark ? "248, 113, 113" : "139, 69, 19"}
+            fifthColor={isDark ? "34, 197, 94" : "16, 185, 129"}
+            pointerColor={isDark ? "99, 102, 241" : "59, 130, 246"}
             interactive={true}
           />
         </div>
 
         {/* Top Navigation Bar */}
         <div className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center p-4">
-          {/* Right side - Theme Toggle (only visible in question mode) */}
-          {questionMode && !isInputFocused && !isReturnedFromResponse && (
+          {/* Always show theme toggle in top-left */}
+          <div className="mr-auto">
             <div className="flex items-center justify-center h-14 w-14 rounded-full backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg">
-              <ThemeToggle />
+              <ThemeToggle onClick={handleThemeChange} />
             </div>
-          )}
+          </div>
         </div>
 
         {/* Main Content */}
