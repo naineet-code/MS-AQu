@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { FunnySearchLoader } from "@/components/ui/funny-search-loader";
 import ResponseCard from "./ResponseSection";
 import { useTheme } from "@/hooks/useTheme";
+import { ButtonTextHoverEffect } from "@/components/ui/button-text-hover-effect";
 
 interface QuestionResponseSectionProps {
   question: string;
@@ -75,15 +76,51 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
               onClick={onNewQuestion}
               variant="outline"
               size="lg"
-              className={`rounded-full transition-all duration-300 px-6 py-3 min-h-[48px] w-auto min-w-[160px] ${
+              className={`group rounded-full transition-all duration-300 px-6 py-3 min-h-[48px] w-auto min-w-[160px] relative overflow-hidden ${
                 isDark 
-                  ? 'bg-zinc-900/30 border-white/10 hover:bg-zinc-800/50 text-white' 
-                  : 'bg-white/20 border-white/20 hover:bg-white/40 text-zinc-800'
+                  ? 'bg-zinc-900/30 border-white/10 hover:bg-zinc-800/50 text-white hover:border-emerald-400/50' 
+                  : 'bg-white/20 border-white/20 hover:bg-white/40 text-zinc-800 hover:border-emerald-500/50'
               }`}
               style={{ pointerEvents: 'auto' }}
             >
-              <ArrowLeft className="h-5 w-5 mr-2 pointer-events-none" />
-              <span className="text-base font-medium pointer-events-none">New Question</span>
+              {/* Enhanced button background with gradient on hover */}
+              <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                isDark 
+                  ? 'bg-gradient-to-r from-emerald-900/20 via-green-800/20 to-blue-900/20' 
+                  : 'bg-gradient-to-r from-emerald-100/40 via-green-100/40 to-blue-100/40'
+              } rounded-full`} />
+              
+              <div className="relative z-10 flex items-center">
+                <motion.div
+                  whileHover={{ x: -2, rotate: -5 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ArrowLeft className="h-5 w-5 mr-2 pointer-events-none" />
+                </motion.div>
+                
+                <div className="relative">
+                  <ButtonTextHoverEffect 
+                    text="New Question" 
+                    duration={0.4}
+                    className="pointer-events-none"
+                  />
+                </div>
+              </div>
+              
+              {/* Additional glow effect on hover */}
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileHover={{ 
+                  opacity: 0.15, 
+                  scale: 1.05,
+                  boxShadow: isDark 
+                    ? "0 0 20px rgba(16, 185, 129, 0.4), 0 0 40px rgba(16, 185, 129, 0.2)" 
+                    : "0 0 20px rgba(16, 185, 129, 0.3), 0 0 40px rgba(16, 185, 129, 0.1)"
+                }}
+                transition={{ duration: 0.3 }}
+                style={{ zIndex: -1 }}
+              />
             </Button>
           </motion.div>
         </div>

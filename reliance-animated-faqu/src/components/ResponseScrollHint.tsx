@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Scroll } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
 interface ResponseScrollHintProps {
@@ -27,7 +27,7 @@ const ResponseScrollHint: React.FC<ResponseScrollHintProps> = ({ containerRef, i
           if (!hasScrolled) {
             setShowHint(true);
           }
-        }, 2000);
+        }, 2000); // Professional timing
       }
     };
 
@@ -65,42 +65,77 @@ const ResponseScrollHint: React.FC<ResponseScrollHintProps> = ({ containerRef, i
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: 10, scale: 0.9 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 10, scale: 0.9 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="absolute bottom-4 right-4 z-50 pointer-events-none"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
+        transition={{ 
+          duration: 0.4, 
+          ease: "easeOut"
+        }}
+        className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none"
       >
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-full backdrop-blur-xl border shadow-xl ${
-          isDark 
-            ? 'bg-gradient-to-r from-gray-900/90 to-gray-800/90 border-white/20 text-white' 
-            : 'bg-gradient-to-r from-white/95 to-gray-50/95 border-gray-300/40 text-gray-800'
-        }`}>
-          <Scroll className="h-4 w-4 opacity-70" />
-          <span className="text-sm font-medium">Scroll for more</span>
-          <motion.div
-            animate={{ y: [0, 4, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <ChevronDown className="h-4 w-4 opacity-70" />
-          </motion.div>
-        </div>
-        
-        {/* Elegant pulsing glow effect */}
-        <motion.div
-          className={`absolute inset-0 rounded-full blur-md -z-10 ${
+        {/* Sleek modern container */}
+        <motion.div 
+          className={`relative flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border ${
             isDark 
-              ? 'bg-gradient-to-r from-blue-500/30 to-purple-500/30' 
-              : 'bg-gradient-to-r from-blue-400/30 to-purple-400/30'
+              ? 'border-gray-600/60 text-gray-200' 
+              : 'border-blue-200/70 text-blue-800'
           }`}
+          style={{
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(71, 85, 105, 0.92) 0%, rgba(100, 116, 139, 0.88) 30%, rgba(148, 163, 184, 0.85) 50%, rgba(100, 116, 139, 0.88) 70%, rgba(71, 85, 105, 0.92) 100%)'
+              : 'linear-gradient(135deg, rgba(232, 249, 255, 0.98) 0%, rgba(240, 244, 255, 0.95) 20%, rgba(249, 232, 255, 0.93) 40%, rgba(232, 249, 255, 0.90) 60%, rgba(255, 249, 232, 0.93) 80%, rgba(232, 249, 255, 0.98) 100%)',
+            boxShadow: isDark
+              ? '0 8px 25px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(255, 255, 255, 0.08) inset, 0 1px 0 rgba(255, 255, 255, 0.12) inset'
+              : '0 8px 25px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(232, 249, 255, 0.9) inset, 0 1px 0 rgba(255, 255, 255, 1) inset'
+          }}
           animate={{
-            scale: [1, 1.1, 1],
-            opacity: [0.5, 0.8, 0.5]
+            y: [0, -2, 0]
           }}
           transition={{
             duration: 3,
             repeat: Infinity,
             ease: "easeInOut"
+          }}
+        >
+          {/* Professional text */}
+          <span className="text-xs font-medium tracking-wide">
+            Scroll for more
+          </span>
+          
+          {/* Elegant chevron animation */}
+          <motion.div
+            animate={{ 
+              y: [0, 2, 0],
+              opacity: [0.6, 1, 0.6]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+          >
+            <ChevronDown className="h-3 w-3" />
+          </motion.div>
+        </motion.div>
+        
+        {/* Subtle glow effect */}
+        <motion.div
+          className="absolute inset-0 rounded-full -z-10"
+          animate={{
+            opacity: [0.15, 0.25, 0.15]
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          style={{
+            background: isDark 
+              ? 'radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, rgba(59, 130, 246, 0.15) 40%, rgba(147, 51, 234, 0.1) 70%, transparent 100%)' 
+              : 'radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(99, 102, 241, 0.08) 40%, rgba(147, 197, 253, 0.06) 70%, transparent 100%)',
+            filter: 'blur(12px)',
+            transform: 'scale(1.8)'
           }}
         />
       </motion.div>
