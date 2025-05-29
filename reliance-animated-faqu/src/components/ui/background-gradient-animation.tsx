@@ -82,16 +82,16 @@ export const BackgroundGradientAnimation = ({
   useEffect(() => {
     function move() {
       if (!interactiveRef.current) return;
-      setCurX(curX + (tgX - curX) / 20);
-      setCurY(curY + (tgY - curY) / 20);
+      setCurX(curX + (tgX - curX) / 15);
+      setCurY(curY + (tgY - curY) / 15);
       interactiveRef.current.style.transform = `translate(${Math.round(curX)}px, ${Math.round(curY)}px)`;
     }
     move();
   }, [tgX, tgY, curX, curY]);
 
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (interactiveRef.current) {
-      const rect = interactiveRef.current.getBoundingClientRect();
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
       setTgX(event.clientX - rect.left);
       setTgY(event.clientY - rect.top);
     }
@@ -109,6 +109,7 @@ export const BackgroundGradientAnimation = ({
         containerClassName
       )}
       ref={containerRef}
+      onMouseMove={interactive ? handleMouseMove : undefined}
     >
       <svg className="hidden">
         <defs>
@@ -177,14 +178,64 @@ export const BackgroundGradientAnimation = ({
           )}
         ></div>
 
+        {/* Additional animated blobs for enhanced dynamics */}
+        <div
+          className={cn(
+            `absolute [background:radial-gradient(circle_at_center,_rgba(var(--first-color),_0.8)_0,_rgba(var(--first-color),_0)_50%)_no-repeat]`,
+            `[mix-blend-mode:var(--blending-value)] w-[calc(var(--size)*1.1)] h-[calc(var(--size)*1.1)] top-[calc(20%-var(--size)/4)] left-[calc(80%-var(--size)/4)]`,
+            `[transform-origin:calc(50%+300px)_calc(50%-300px)]`,
+            `animate-third`,
+            `opacity-90`
+          )}
+        ></div>
+        
+        <div
+          className={cn(
+            `absolute [background:radial-gradient(circle_at_center,_rgba(var(--third-color),_0.9)_0,_rgba(var(--third-color),_0)_50%)_no-repeat]`,
+            `[mix-blend-mode:var(--blending-value)] w-[calc(var(--size)*0.9)] h-[calc(var(--size)*0.9)] top-[calc(80%-var(--size)/3)] left-[calc(10%-var(--size)/3)]`,
+            `[transform-origin:calc(50%-600px)_calc(50%+400px)]`,
+            `animate-fifth`,
+            `opacity-80`
+          )}
+        ></div>
+        
+        <div
+          className={cn(
+            `absolute [background:radial-gradient(circle_at_center,_rgba(var(--second-color),_0.85)_0,_rgba(var(--second-color),_0)_50%)_no-repeat]`,
+            `[mix-blend-mode:var(--blending-value)] w-[calc(var(--size)*0.75)] h-[calc(var(--size)*0.75)] top-[calc(10%-var(--size)/5)] left-[calc(90%-var(--size)/5)]`,
+            `[transform-origin:calc(50%+500px)_calc(50%-100px)]`,
+            `animate-second`,
+            `opacity-85`
+          )}
+        ></div>
+        
+        <div
+          className={cn(
+            `absolute [background:radial-gradient(circle_at_center,_rgba(var(--fourth-color),_0.75)_0,_rgba(var(--fourth-color),_0)_50%)_no-repeat]`,
+            `[mix-blend-mode:var(--blending-value)] w-[calc(var(--size)*1.0)] h-[calc(var(--size)*1.0)] top-[calc(60%-var(--size)/2)] left-[calc(15%-var(--size)/2)]`,
+            `[transform-origin:calc(50%-300px)_calc(50%+200px)]`,
+            `animate-first`,
+            `opacity-75`
+          )}
+        ></div>
+        
+        <div
+          className={cn(
+            `absolute [background:radial-gradient(circle_at_center,_rgba(var(--fifth-color),_0.8)_0,_rgba(var(--fifth-color),_0)_50%)_no-repeat]`,
+            `[mix-blend-mode:var(--blending-value)] w-[calc(var(--size)*0.85)] h-[calc(var(--size)*0.85)] top-[calc(40%-var(--size)/2)] left-[calc(85%-var(--size)/2)]`,
+            `[transform-origin:calc(50%+400px)_calc(50%+100px)]`,
+            `animate-fourth`,
+            `opacity-80`
+          )}
+        ></div>
+
         {interactive && (
           <div
             ref={interactiveRef}
-            onMouseMove={handleMouseMove}
             className={cn(
-              `absolute [background:radial-gradient(circle_at_center,_rgba(var(--pointer-color),_0.8)_0,_rgba(var(--pointer-color),_0)_50%)_no-repeat]`,
-              `[mix-blend-mode:var(--blending-value)] w-full h-full -top-1/2 -left-1/2`,
-              `opacity-70`
+              `absolute [background:radial-gradient(circle_at_center,_rgba(var(--pointer-color),_0.9)_0,_rgba(var(--pointer-color),_0)_50%)_no-repeat]`,
+              `[mix-blend-mode:var(--blending-value)] w-[calc(var(--size)*1.2)] h-[calc(var(--size)*1.2)]`,
+              `opacity-60 pointer-events-none -top-1/2 -left-1/2`
             )}
           ></div>
         )}

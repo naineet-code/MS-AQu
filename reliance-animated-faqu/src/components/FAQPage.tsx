@@ -195,14 +195,14 @@ export default function FAQPage() {
         {/* Fixed Background */}
         <div className="fixed inset-0 z-0">
           <BackgroundGradientAnimation
-            gradientBackgroundStart={isDark ? "rgb(13, 13, 13)" : "rgb(250, 250, 250)"}
-            gradientBackgroundEnd={isDark ? "rgb(30, 41, 59)" : "rgb(200, 220, 240)"}
-            firstColor={isDark ? "59, 130, 246" : "99, 102, 241"}
-            secondColor={isDark ? "147, 51, 234" : "59, 130, 246"}
-            thirdColor={isDark ? "236, 72, 153" : "168, 85, 247"}
-            fourthColor={isDark ? "248, 113, 113" : "139, 69, 19"}
-            fifthColor={isDark ? "34, 197, 94" : "16, 185, 129"}
-            pointerColor={isDark ? "99, 102, 241" : "59, 130, 246"}
+            gradientBackgroundStart={isDark ? "rgb(13, 13, 13)" : "rgb(240, 245, 250)"}
+            gradientBackgroundEnd={isDark ? "rgb(30, 41, 59)" : "rgb(230, 240, 250)"}
+            firstColor={isDark ? "59, 130, 246" : "59, 130, 246"}
+            secondColor={isDark ? "147, 51, 234" : "147, 51, 234"}
+            thirdColor={isDark ? "236, 72, 153" : "236, 72, 153"}
+            fourthColor={isDark ? "248, 113, 113" : "248, 113, 113"}
+            fifthColor={isDark ? "34, 197, 94" : "34, 197, 94"}
+            pointerColor={isDark ? "99, 102, 241" : "99, 102, 241"}
             interactive={true}
           />
         </div>
@@ -219,9 +219,9 @@ export default function FAQPage() {
         */}
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 pb-12 relative z-10">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 pb-12 relative z-10 pointer-events-none">
           <PageTitle isVisible={!isInputFocused && questionMode && !isReturnedFromResponse} />
-          <div className="w-full max-w-3xl mx-auto space-y-6">
+          <div className="w-full max-w-3xl mx-auto space-y-6 pointer-events-auto">
             <AnimatePresence mode="wait">
               {questionMode ? (
                 <motion.div
