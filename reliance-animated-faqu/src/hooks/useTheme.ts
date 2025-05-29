@@ -3,48 +3,54 @@ import { useState, useEffect, useCallback } from 'react';
 type Theme = 'light' | 'dark';
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    // Simple initial theme detection
-    if (typeof window !== 'undefined') {
-      const storedTheme = localStorage.getItem('theme') as Theme;
-      if (storedTheme && (storedTheme === 'light' || storedTheme === 'dark')) {
-        return storedTheme;
-      }
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'light';
-  });
+  // Always use light theme
+  const [theme, setTheme] = useState<Theme>('light');
 
-  // Simple theme application
+  // Enhanced theme application - only apply light theme
   const applyTheme = useCallback((newTheme: Theme) => {
+    if (typeof window === 'undefined') return;
+    
     const root = window.document.documentElement;
+    const body = window.document.body;
     
-    // Apply theme classes
-    if (newTheme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.remove('dark');
-      root.classList.add('light');
-    }
+    // Remove all theme classes first
+    root.classList.remove('dark', 'light');
+    body.classList.remove('dark', 'light');
     
-    // Store theme preference
-    localStorage.setItem('theme', newTheme);
+    // Always apply light theme
+    root.classList.add('light');
+    body.classList.add('light');
+    
+    // Update data attribute for consistency
+    root.setAttribute('data-theme', 'light');
+    
+    // Store light theme preference
+    localStorage.setItem('theme', 'light');
+    
+    // Force a style recalculation
+    root.style.colorScheme = 'light';
   }, []);
 
+  // Apply light theme on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    applyTheme(theme);
-  }, [theme, applyTheme]);
+    applyTheme('light');
+  }, [applyTheme]);
 
-  // Simple toggle function
+  // Apply initial light theme immediately on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      applyTheme('light');
+    }
+  }, []);
+
+  // Disabled toggle function - does nothing
   const toggleTheme = useCallback(() => {
-    const newTheme: Theme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-  }, [theme]);
+    // Do nothing - theme switching disabled
+    console.log('Theme switching is disabled - staying on light theme');
+  }, []);
 
   return { 
-    theme, 
+    theme: 'light' as Theme, // Always return light
     toggleTheme
   };
 }

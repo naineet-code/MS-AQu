@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 // PDF and control icons
 import { FileText, X, ExternalLink, RotateCcw, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2, Brain } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import ChatHistory from "./ChatHistory";
 import { useChatHistory } from "@/hooks/useChatHistory";
 import { useTheme } from "@/hooks/useTheme";
@@ -209,14 +208,15 @@ export default function FAQPage() {
         </div>
 
         {/* Top Navigation Bar */}
+        {/* Theme toggle button removed - light theme only
         <div className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center p-4">
-          {/* Always show theme toggle in top-left */}
           <div className="mr-auto">
             <div className="flex items-center justify-center h-14 w-14 rounded-full backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg">
               <ThemeToggle onClick={handleThemeChange} />
             </div>
           </div>
         </div>
+        */}
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 pb-12 relative z-10">

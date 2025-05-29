@@ -155,7 +155,7 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
         className={`transition-all duration-500 ${
           isDark 
             ? 'bg-zinc-900/30 border-white/10' 
-            : 'bg-white/20 border-white/20'
+            : 'bg-white/10 border-gray-100/30'
         } shadow-2xl`}
       >
         <Card className="bg-transparent border-0 shadow-none rounded-3xl">

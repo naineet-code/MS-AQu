@@ -39,15 +39,26 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
 
   return (
     <motion.div
-      className="fixed bottom-20 right-4 z-30 w-80 sm:w-96 max-h-[70vh] overflow-hidden"
+      key={`chat-history-${theme}`}
+      className="fixed bottom-20 right-4 z-[9998] w-80 sm:w-96 max-h-[70vh] overflow-hidden"
       initial={{ opacity: 0, y: 20, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 20, scale: 0.9 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className="backdrop-blur-xl bg-white/10 dark:bg-black/30 border-white/20 dark:border-white/10 shadow-2xl overflow-hidden">
-        <div className="p-4 flex items-center justify-between border-b border-white/10 dark:border-white/5">
-          <h3 className={`font-medium text-lg ${isDark ? 'text-white' : 'text-black'}`}>Chat History</h3>
+      <Card className={`backdrop-blur-xl shadow-2xl overflow-hidden border-2 transition-all duration-300 ${
+        isDark 
+          ? 'bg-gray-900/95 border-gray-600' 
+          : 'bg-white/95 border-gray-400'
+      }`}>
+        <div className={`p-4 flex items-center justify-between border-b transition-colors duration-300 ${
+          isDark ? 'border-gray-700' : 'border-gray-200'
+        }`}>
+          <h3 className={`font-medium text-lg transition-colors duration-300 ${
+            isDark ? 'text-white' : 'text-gray-900'
+          }`}>
+            Chat History
+          </h3>
           <div className="flex gap-2">
             {/* Clear History */}
             <Tooltip>
@@ -56,10 +67,14 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
                   variant="ghost" 
                   size="icon" 
                   onClick={onClear}
-                  className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
+                  className={`h-8 w-8 transform transition-all duration-300 hover:scale-110 ${
+                    isDark 
+                      ? 'hover:bg-gray-700 text-gray-300 hover:text-red-400' 
+                      : 'hover:bg-gray-100 text-gray-700 hover:text-red-600'
+                  }`}
                   aria-label="Clear chat history"
                 >
-                  <Trash2 className="h-4 w-4 hover:animate-pulse" />
+                  <Trash2 className="h-4 w-4 transition-colors duration-300" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Clear History</TooltipContent>
@@ -71,10 +86,14 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
                   variant="ghost" 
                   size="icon" 
                   onClick={onClose}
-                  className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
+                  className={`h-8 w-8 transform transition-all duration-300 hover:scale-110 ${
+                    isDark 
+                      ? 'hover:bg-gray-700 text-gray-300 hover:text-gray-100' 
+                      : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
+                  }`}
                   aria-label="Close chat history"
                 >
-                  <X className="h-4 w-4 hover:animate-pulse" />
+                  <X className="h-4 w-4 transition-colors duration-300" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Close History</TooltipContent>
@@ -84,16 +103,29 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
         <div className="overflow-y-auto p-4 max-h-[60vh] space-y-3">
           {messages.length > 0 ? (
             messages.map((msg) => (
-              <div 
-                key={msg.id}
-                className={`p-3 rounded-lg ${
+              <motion.div 
+                key={`${msg.id}-${theme}`}
+                className={`p-3 rounded-lg transition-all duration-300 ${
                   msg.isUser 
-                    ? "bg-purple-500/20 ml-6 border border-purple-500/30" 
-                    : "bg-blue-500/20 mr-6 border border-blue-500/30"
+                    ? `ml-6 border ${
+                        isDark 
+                          ? 'bg-purple-900/40 border-purple-500/50' 
+                          : 'bg-purple-100/60 border-purple-300/60'
+                      }` 
+                    : `mr-6 border ${
+                        isDark 
+                          ? 'bg-blue-900/40 border-blue-500/50' 
+                          : 'bg-blue-100/60 border-blue-300/60'
+                      }`
                 }`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
               >
                 {/* Message content */}
-                <div className={`text-sm mb-2 ${isDark ? 'text-white/90' : 'text-black/90'}`}>
+                <div className={`text-sm mb-2 transition-colors duration-300 ${
+                  isDark ? 'text-white/90' : 'text-gray-900/90'
+                }`}>
                   {msg.isUser ? (
                     // User messages: always show full text (questions are usually short)
                     <p>{msg.message}</p>
@@ -111,8 +143,10 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
                           variant="ghost"
                           size="sm"
                           onClick={() => toggleMessageExpansion(msg.id)}
-                          className={`mt-2 p-1 h-auto text-xs hover:bg-white/10 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada ${
-                            isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+                          className={`mt-2 p-1 h-auto text-xs transition-all duration-300 hover:scale-105 ${
+                            isDark 
+                              ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-900/30' 
+                              : 'text-blue-600 hover:text-blue-700 hover:bg-blue-100/50'
                           }`}
                         >
                           {expandedMessages.has(msg.id) ? (
@@ -132,13 +166,24 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
                   )}
                 </div>
                 {/* Timestamp */}
-                <p className={`text-xs ${isDark ? 'text-white/50' : 'text-black/50'}`}>
+                <p className={`text-xs transition-colors duration-300 ${
+                  isDark ? 'text-gray-400' : 'text-gray-600'
+                }`}>
                   {formatDistanceToNow(msg.timestamp, { addSuffix: true })}
                 </p>
-              </div>
+              </motion.div>
             ))
           ) : (
-            <p className={`text-center py-4 ${isDark ? 'text-white/50' : 'text-black/50'}`}>No messages yet</p>
+            <motion.p 
+              className={`text-center py-4 transition-colors duration-300 ${
+                isDark ? 'text-gray-400' : 'text-gray-600'
+              }`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              No messages yet
+            </motion.p>
           )}
         </div>
       </Card>
