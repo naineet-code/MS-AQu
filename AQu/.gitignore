@@ -41,4 +41,8 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-.env 
+.env
+.env.backup
+cred.toml
+test_credentials.py
+*.toml 
