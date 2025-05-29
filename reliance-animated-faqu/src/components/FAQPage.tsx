@@ -8,7 +8,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogClose } from "
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 // PDF and control icons
-import { FileText, X, Maximize2, RotateCcw, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2, Brain } from "lucide-react";
+import { FileText, X, ExternalLink, RotateCcw, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2, Brain } from "lucide-react";
 import { ThemeToggle, themeChangeEvent, THEME_CHANGE_EVENT } from "@/components/ui/theme-toggle";
 import ChatHistory from "./ChatHistory";
 import { useChatHistory } from "@/hooks/useChatHistory";
@@ -18,7 +18,7 @@ import { marked } from 'marked';
 import { aiFormatter } from '@/utils/aiFormatter';
 import HelpScreen from "./HelpScreen";
 import { loadBackendUrl } from "@/config";
-import AIInfoSection from './AIInfoSection';
+import { AIInfoSection } from './AIInfoSection';
 import { useChatState } from '@/hooks/useChatState';
 import { usePdfDialog } from '@/hooks/usePdfDialog';
 import { getRandomInitSteps } from '@/data/initializationSteps';
@@ -77,7 +77,6 @@ export default function FAQPage() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [showAIInfo, setShowAIInfo] = useState(false);
   const [animationKey, setAnimationKey] = useState(Date.now());
-  const [isFullScreen, setIsFullScreen] = useState(false);
 
   // Handle theme changes and background animation refresh
   useEffect(() => {
@@ -409,7 +408,7 @@ export default function FAQPage() {
       {/* PDF Viewer Dialog */}
       {showPdfDialog && (
         <Dialog open={showPdfDialog} onOpenChange={setShowPdfDialog}>
-          <DialogContent className={`${isFullScreen ? 'fixed inset-0 max-w-none w-screen h-screen max-h-none rounded-none z-50' : 'max-w-4xl w-[90vw] max-h-[90vh]'} p-0 gap-0 transition-all duration-300`}>
+          <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] p-0 gap-0 transition-all duration-300">
             {/* Header with Title and Controls */}
             <div className="relative flex items-center py-2 px-4 rounded-t-lg shadow-sm border-b bg-white/70 dark:bg-gray-900/70 backdrop-blur-md min-h-0">
               <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400 mr-2" />
@@ -441,14 +440,16 @@ export default function FAQPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label="Full Screen"
-                      onClick={() => setIsFullScreen(v => !v)}
+                      aria-label="Open in Tab"
+                      onClick={() => {
+                        window.open(`${backendUrl}/pdf/reliance/reliance_faq.pdf`, '_blank');
+                      }}
                       className="h-8 w-8 rounded-full hover:bg-green-100/60 dark:hover:bg-green-900/40 flex items-center justify-center"
                     >
-                      <Maximize2 className="h-5 w-5" />
+                      <ExternalLink className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Full Screen</TooltipContent>
+                  <TooltipContent>Open in Tab</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>

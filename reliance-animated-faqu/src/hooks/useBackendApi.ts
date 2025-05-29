@@ -58,6 +58,14 @@ export const useBackendApi = (): UseBackendApiReturn => {
     try {
       // First attempt with current backend URL
       const data = await makeApiRequest(question, backendUrl);
+      console.log('✅ Raw backend response:', JSON.stringify(data, null, 2));
+      console.log('✅ Backend response keys:', Object.keys(data));
+      console.log('✅ Has answer?', !!data.answer);
+      console.log('✅ Has reasoning?', !!data.reasoning);
+      console.log('✅ Has model?', !!data.model);
+      console.log('✅ Has models?', !!data.models);
+      console.log('✅ Has citations?', !!data.citations);
+      console.log('✅ Has costs?', !!data.costs);
       console.log('✅ Setting response data:', data);
       setResponseData(data);
     } catch (firstError) {
@@ -71,6 +79,7 @@ export const useBackendApi = (): UseBackendApiReturn => {
         if (newBackendUrl !== backendUrl) {
           console.log('🔄 Trying with new backend URL:', newBackendUrl);
           const data = await makeApiRequest(question, newBackendUrl);
+          console.log('✅ Raw backend response (retry):', JSON.stringify(data, null, 2));
           console.log('✅ Setting response data from retry:', data);
           setResponseData(data);
         } else {

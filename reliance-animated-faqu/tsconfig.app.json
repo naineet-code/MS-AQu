@@ -10,7 +10,6 @@
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
     "jsx": "react-jsx",
 
     /* Linting */
@@ -23,7 +22,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+
+    /* Project References */
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true
   },
   "include": ["src"]
 }

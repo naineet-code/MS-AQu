@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/hooks/useChatHistory";
 // Chat history icons
-import { X, ChevronDown, ChevronUp } from "lucide-react";
+import { X, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
@@ -49,6 +49,21 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
         <div className="p-4 flex items-center justify-between border-b border-white/10 dark:border-white/5">
           <h3 className={`font-medium text-lg ${isDark ? 'text-white' : 'text-black'}`}>Chat History</h3>
           <div className="flex gap-2">
+            {/* Clear History */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={onClear}
+                  className="h-8 w-8 transform transition-transform duration-200 ease-in-out hover:animate-hover-tada"
+                  aria-label="Clear chat history"
+                >
+                  <Trash2 className="h-4 w-4 hover:animate-pulse" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Clear History</TooltipContent>
+            </Tooltip>
             {/* Close History */}
             <Tooltip>
               <TooltipTrigger asChild>

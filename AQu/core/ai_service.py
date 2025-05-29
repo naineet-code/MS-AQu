@@ -15,25 +15,33 @@ class AIService:
         self.logger = logging.getLogger(__name__)
         self.settings = Settings()
         self.logger.info(f"Settings loaded: {self.settings.config}")
-        self.client = self._initialize_client()
+        
         # Load pricing configuration
         with open("config/config.json", "r") as f:
             self.pricing_config = json.load(f)["MODEL_PRICING"]
-        # Set model name from settings
-        self.model_name = self.settings.get("AZURE_OPENAI_DEPLOYMENT_MINI")
+            
+        # Initialize clients for different models
+        self.mini_client = self._initialize_client("mini")
+        self.main_client = self._initialize_client("main")
+        self.nano_client = self._initialize_client("nano")
         
-    def _initialize_client(self) -> AzureOpenAI:
-        """Initialize the Azure OpenAI client."""
+        # Store model names
+        self.mini_model = self.settings.get("AZURE_OPENAI_DEPLOYMENT_MINI")
+        self.main_model = self.settings.get("AZURE_OPENAI_DEPLOYMENT_MAIN")
+        self.nano_model = self.settings.get("AZURE_OPENAI_DEPLOYMENT_NANO")
+        
+    def _initialize_client(self, model_type: str) -> AzureOpenAI:
+        """Initialize the Azure OpenAI client for a specific model type."""
         try:
-            api_key = self.settings.get("AZURE_OPENAI_API_KEY_MINI", "").strip()
-            api_version = self.settings.get("AZURE_OPENAI_API_VERSION_MINI", "").strip()
-            azure_endpoint = self.settings.get("AZURE_OPENAI_ENDPOINT_MINI", "").strip()
+            api_key = self.settings.get(f"AZURE_OPENAI_API_KEY_{model_type.upper()}", "").strip()
+            api_version = self.settings.get(f"AZURE_OPENAI_API_VERSION_{model_type.upper()}", "").strip()
+            azure_endpoint = self.settings.get(f"AZURE_OPENAI_ENDPOINT_{model_type.upper()}", "").strip()
             
             if not all([api_key, api_version, azure_endpoint]):
-                self.logger.error("Missing required Azure OpenAI environment variables")
-                raise ValueError("Missing required Azure OpenAI environment variables")
+                self.logger.error(f"Missing required Azure OpenAI environment variables for {model_type} model")
+                raise ValueError(f"Missing required Azure OpenAI environment variables for {model_type} model")
             
-            self.logger.info(f"Initializing Azure OpenAI client with:")
+            self.logger.info(f"Initializing Azure OpenAI client for {model_type} model:")
             self.logger.info(f"API Key: {api_key[:8]}...")
             self.logger.info(f"API Version: {api_version}")
             self.logger.info(f"Azure Endpoint: {azure_endpoint}")
@@ -45,14 +53,13 @@ class AIService:
                 http_client=httpx.Client()
             )
         except Exception as e:
-            self.logger.error(f"Error initializing Azure OpenAI client: {str(e)}")
+            self.logger.error(f"Error initializing Azure OpenAI client for {model_type} model: {str(e)}")
             raise
             
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int, is_cached: bool = False) -> Dict:
         """Calculate costs based on token usage and model pricing."""
         if model not in self.pricing_config:
-            self.logger.warning(f"Unknown model {model}, using default pricing")
-            model = self.settings.get("AZURE_OPENAI_DEPLOYMENT_MINI")
+            raise ValueError(f"Unknown model {model} - no pricing configuration available")
         
         pricing = self.pricing_config[model]
         input_rate = pricing["cachedInput"] if is_cached else pricing["input"]
@@ -96,8 +103,8 @@ Instructions:
 
 Reasoning:"""
 
-            reasoning_response = self.client.chat.completions.create(
-                model=self.model_name,
+            reasoning_response = self.mini_client.chat.completions.create(
+                model=self.mini_model,
                 messages=[
                     {"role": "system", "content": "You are a helpful AI assistant that explains reasoning clearly."},
                     {"role": "user", "content": reasoning_prompt}
@@ -108,14 +115,14 @@ Reasoning:"""
             
             reasoning = reasoning_response.choices[0].message.content.strip()
             
-            # Calculate reasoning costs
+            # Calculate reasoning costs using mini model pricing
             reasoning_costs = self._calculate_cost(
-                self.model_name,
+                self.mini_model,
                 reasoning_response.usage.prompt_tokens,
                 reasoning_response.usage.completion_tokens
             )
             
-            # Generate answer using mini model
+            # Generate answer using main model
             answer_prompt = f"""Question: {query}
 
 Context:
@@ -130,8 +137,8 @@ Instructions:
 
 Answer:"""
 
-            answer_response = self.client.chat.completions.create(
-                model=self.model_name,
+            answer_response = self.main_client.chat.completions.create(
+                model=self.main_model,
                 messages=[
                     {"role": "system", "content": "You are a helpful AI assistant that answers questions based on provided context."},
                     {"role": "user", "content": answer_prompt}
@@ -142,11 +149,43 @@ Answer:"""
             
             answer = answer_response.choices[0].message.content.strip()
             
-            # Calculate answer costs
+            # Calculate answer costs using main model pricing
             answer_costs = self._calculate_cost(
-                self.model_name,
+                self.main_model,
                 answer_response.usage.prompt_tokens,
                 answer_response.usage.completion_tokens
+            )
+            
+            # Verify answer using nano model
+            verification_prompt = f"""Question: {query}
+
+Answer: {answer}
+
+Instructions:
+1. Verify if the answer is accurate and complete
+2. Check if all citations are correct
+3. Identify any missing information
+4. Be concise
+
+Verification:"""
+
+            verification_response = self.nano_client.chat.completions.create(
+                model=self.nano_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant that verifies answers for accuracy."},
+                    {"role": "user", "content": verification_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=300
+            )
+            
+            verification = verification_response.choices[0].message.content.strip()
+            
+            # Calculate verification costs using nano model pricing
+            verification_costs = self._calculate_cost(
+                self.nano_model,
+                verification_response.usage.prompt_tokens,
+                verification_response.usage.completion_tokens
             )
             
             # Extract citations and relevant paragraphs
@@ -162,53 +201,58 @@ Answer:"""
             # Combine costs with proper structure for frontend
             costs = [
                 {
-                    "model": f"{reasoning_costs['model']} (Reasoning)",
+                    "model": reasoning_costs['model'],
                     "inputTokens": reasoning_response.usage.prompt_tokens,
                     "outputTokens": reasoning_response.usage.completion_tokens,
                     "totalTokens": reasoning_response.usage.total_tokens,
                     "inputCost": reasoning_costs["inputCost"],
                     "outputCost": reasoning_costs["outputCost"],
-                    "totalCost": reasoning_costs["totalCost"],
-                    # Legacy field names for compatibility
-                    "input_tokens": reasoning_response.usage.prompt_tokens,
-                    "output_tokens": reasoning_response.usage.completion_tokens,
-                    "total_tokens": reasoning_response.usage.total_tokens,
-                    "input_cost": reasoning_costs["inputCost"],
-                    "output_cost": reasoning_costs["outputCost"],
-                    "total_cost": reasoning_costs["totalCost"]
+                    "totalCost": reasoning_costs["totalCost"]
                 },
                 {
-                    "model": f"{answer_costs['model']} (Answer)",
+                    "model": answer_costs['model'],
                     "inputTokens": answer_response.usage.prompt_tokens,
                     "outputTokens": answer_response.usage.completion_tokens,
                     "totalTokens": answer_response.usage.total_tokens,
                     "inputCost": answer_costs["inputCost"],
                     "outputCost": answer_costs["outputCost"],
-                    "totalCost": answer_costs["totalCost"],
-                    # Legacy field names for compatibility
-                    "input_tokens": answer_response.usage.prompt_tokens,
-                    "output_tokens": answer_response.usage.completion_tokens,
-                    "total_tokens": answer_response.usage.total_tokens,
-                    "input_cost": answer_costs["inputCost"],
-                    "output_cost": answer_costs["outputCost"],
-                    "total_cost": answer_costs["totalCost"]
+                    "totalCost": answer_costs["totalCost"]
+                },
+                {
+                    "model": verification_costs['model'],
+                    "inputTokens": verification_response.usage.prompt_tokens,
+                    "outputTokens": verification_response.usage.completion_tokens,
+                    "totalTokens": verification_response.usage.total_tokens,
+                    "inputCost": verification_costs["inputCost"],
+                    "outputCost": verification_costs["outputCost"],
+                    "totalCost": verification_costs["totalCost"]
                 }
             ]
             
             # Calculate total usage
             total_usage = {
-                "total_tokens": reasoning_response.usage.total_tokens + answer_response.usage.total_tokens,
-                "answer_tokens": answer_response.usage.completion_tokens,
-                "reasoning_tokens": reasoning_response.usage.completion_tokens
+                "total_tokens": (
+                    reasoning_response.usage.total_tokens +
+                    answer_response.usage.total_tokens +
+                    verification_response.usage.total_tokens
+                ),
+                "reasoning_tokens": reasoning_response.usage.total_tokens,
+                "answer_tokens": answer_response.usage.total_tokens,
+                "verification_tokens": verification_response.usage.total_tokens
             }
             
             return {
                 "answer": answer,
                 "reasoning": reasoning,
+                "verification": verification,
                 "citations": citations,
                 "relevant_paragraphs": relevant_paragraphs,
                 "costs": costs,
-                "model": self.model_name,
+                "models": {
+                    "reasoning": self.mini_model,
+                    "answer": self.main_model,
+                    "verification": self.nano_model
+                },
                 "usage": total_usage,
                 "success": True,
                 "timestamp": datetime.datetime.now().timestamp()
@@ -216,10 +260,7 @@ Answer:"""
             
         except Exception as e:
             self.logger.error(f"Error processing query: {str(e)}")
-            return self._create_empty_response(
-                "I apologize, but I encountered an error while processing your question.",
-                f"Error: {str(e)}"
-            )
+            return self._create_error_response(str(e))
     
     def _create_empty_response(self, answer: str, reasoning: str) -> Dict:
         """Create a properly structured empty response."""
@@ -229,11 +270,16 @@ Answer:"""
             "citations": [],
             "relevant_paragraphs": [],
             "costs": [],
-            "model": self.model_name,
+            "models": {
+                "reasoning": self.mini_model,
+                "answer": self.main_model,
+                "verification": self.nano_model
+            },
             "usage": {
                 "total_tokens": 0,
+                "reasoning_tokens": 0,
                 "answer_tokens": 0,
-                "reasoning_tokens": 0
+                "verification_tokens": 0
             },
             "success": True,
             "timestamp": time.time()
@@ -247,11 +293,16 @@ Answer:"""
             "citations": [],
             "relevant_paragraphs": [],
             "costs": [],
-            "model": self.model_name,
+            "models": {
+                "reasoning": self.mini_model,
+                "answer": self.main_model,
+                "verification": self.nano_model
+            },
             "usage": {
                 "total_tokens": 0,
+                "reasoning_tokens": 0,
                 "answer_tokens": 0,
-                "reasoning_tokens": 0
+                "verification_tokens": 0
             },
             "success": False,
             "error": error_message,
