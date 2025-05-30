@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import json
 import logging
 from .credentials import get_credentials_manager
+from config.redis_config import REDIS_CONFIG
 
 class Settings:
     def __init__(self):
@@ -144,4 +145,5 @@ class Settings:
             self.logger.error(f"Error validating credentials: {str(e)}")
             return False
             
+        # Add Redis validation if needed
         return True 

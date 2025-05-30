@@ -63,7 +63,7 @@ const PageTitle: React.FC<PageTitleProps> = ({ isVisible }) => {
 
   return (
     <motion.div
-      className="relative text-center mb-10 w-full"
+      className="relative text-center mb-8 w-full"
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 24 }}

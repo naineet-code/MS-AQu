@@ -132,3 +132,213 @@ To test the rich text formatting:
 - Keep formatting semantic and meaningful
 - Test with actual content to ensure readability
 - Consider response size when adding extensive formatting
+
+## Redis Caching System
+
+### Overview
+The backend now implements an advanced Redis caching system with semantic similarity matching, answer verification, and comprehensive cost tracking. This significantly improves response times and reduces API costs.
+
+### Cache Strategy
+
+#### 1. **Semantic Similarity Matching**
+- Uses OpenAI's `text-embedding-ada-002` model to generate embeddings
+- Implements cosine similarity to find semantically similar cached queries
+- Default similarity threshold: 0.85 (configurable)
+- Cache keys: MD5 hash of query+category combination
+
+#### 2. **Answer Verification**
+- Cached answers are verified using GPT Nano model
+- Returns confidence scores (0-100%) for relevance
+- Automatically removes invalid/outdated cache entries
+- Ensures cached responses remain accurate over time
+
+#### 3. **Cost Optimization**
+- ~90% cost reduction for cache hits
+- ~50x faster response times from cache
+- Transparent cost tracking for all operations
+- Detailed breakdown by operation type
+
+### API Request Parameters
+
+#### Query Endpoint (`POST /api/query`)
+```json
+{
+  "query": "string",
+  "category": "string",
+  "force_no_cache": boolean  // Optional, defaults to false
+}
+```
+
+#### Force No Cache Parameter
+- `force_no_cache`: When set to `true`, bypasses cache completely
+- Useful for generating fresh responses when needed
+- Frontend displays a subtle refresh button for cached responses
+
+### Enhanced Response Structure
+
+The API response now includes additional cache-related information:
+
+```json
+{
+  "answer": "**Main Answer**: This is the primary response with *formatting*",
+  "reasoning": "### Analysis Process\n1. First step\n2. Second step",
+  "relevant_paragraphs": [...],
+  "citations": [...],
+  
+  // Cache Information
+  "cache_hit": true,
+  "similarity_score": 0.92,
+  "verification": {
+    "confidence": 95,
+    "reason": "High relevance match"
+  },
+  "forced_no_cache": false,
+  
+  // Cost Information
+  "cost": {
+    "total": 0.0234,
+    "breakdown": {
+      "embedding": 0.0001,
+      "verification": 0.0005,
+      "generation": 0.0228
+    }
+  },
+  
+  // Performance Metrics
+  "response_time_ms": 145,
+  "tokens_used": {
+    "prompt": 1250,
+    "completion": 320,
+    "total": 1570
+  }
+}
+```
+
+### Cache Status Indicators
+
+The frontend displays cache status with visual indicators:
+- **🚀 Cached**: Response served from cache
+- **✨ Fresh**: Newly generated response
+- **🔄 Refreshed**: Force no-cache was used
+- **Similarity %**: Shows match percentage for cached responses
+- **Confidence Score**: Verification confidence level
+
+### Cache Configuration
+
+#### Environment Variables
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=optional
+CACHE_TTL=3600                    # Cache lifetime in seconds (default: 1 hour)
+CACHE_SIMILARITY_THRESHOLD=0.85    # Similarity threshold (0-1)
+```
+
+### Administrative Endpoints
+
+#### Cache Statistics (`GET /api/ai-status`)
+Returns comprehensive cache statistics:
+```json
+{
+  "cache": {
+    "status": "connected",
+    "performance": {
+      "hit_rate": 78.5,
+      "total_queries": 142,
+      "cache_hits": 112,
+      "cache_misses": 30
+    },
+    "memory": {
+      "used_memory_human": "2.1MB",
+      "used_memory_mb": 2.1
+    },
+    "config": {
+      "ttl": 3600,
+      "similarity_threshold": 0.85
+    }
+  }
+}
+```
+
+#### Clear Cache (`POST /api/clear-cache`)
+Clears all cached responses (requires admin authentication in production).
+
+#### Download Logs (`GET /api/download-question-logs`)
+Downloads comprehensive CSV file with:
+- All question logs with cache statistics
+- Current cache contents
+- Performance metrics
+- Cost breakdown
+
+### Cache Flow Example
+
+1. **User submits question**: "What is WSSI?"
+2. **Embedding generation**: Create embedding using Ada model (~$0.0001)
+3. **Similarity search**: Find similar cached queries in Redis
+4. **Match found**: Query "What does WSSI mean?" with 0.91 similarity
+5. **Verification**: Check relevance using Nano model (~$0.0005)
+6. **Response**: Return cached answer with cache status
+7. **Total cost**: ~$0.0006 vs ~$0.023 for fresh generation
+
+### Frontend Integration
+
+#### Displaying Cache Status
+```typescript
+// Response includes cache information
+if (response.cache_hit) {
+  showCacheIndicator(response.similarity_score, response.verification);
+  showForceRefreshButton();
+}
+```
+
+#### Force Refresh Request
+```typescript
+// User clicks refresh button
+const freshResponse = await fetch('/api/query', {
+  method: 'POST',
+  body: JSON.stringify({
+    query: "What is WSSI?",
+    category: "reliance",
+    force_no_cache: true  // Bypass cache
+  })
+});
+```
+
+### Performance Guidelines
+
+1. **Cache-Friendly Queries**: Encourage consistent phrasing for better cache hits
+2. **Category Usage**: Always specify correct category for optimal caching
+3. **Monitoring**: Use dashboard to monitor cache performance
+4. **TTL Configuration**: Adjust based on content update frequency
+5. **Threshold Tuning**: Lower threshold for more cache hits, higher for accuracy
+
+### Cost Tracking Details
+
+The system tracks costs for:
+- **Embedding Generation**: Ada model costs for creating query embeddings
+- **Similarity Search**: Minimal Redis operation costs
+- **Answer Verification**: Nano model costs for relevance checking
+- **Fresh Generation**: Full GPT-4 costs when cache miss occurs
+
+Cost breakdown helps understand:
+- True savings from caching
+- API usage patterns
+- Optimization opportunities
+- Budget planning
+
+### Troubleshooting
+
+Common issues and solutions:
+1. **Low Cache Hit Rate**: Adjust similarity threshold or review query patterns
+2. **Stale Responses**: Reduce TTL or implement content-based invalidation
+3. **High Verification Failures**: Review document updates or model changes
+4. **Memory Issues**: Monitor Redis memory usage and implement eviction policies
+
+### Best Practices
+
+1. **Query Normalization**: Consistent formatting improves cache hits
+2. **Category Selection**: Accurate categories ensure relevant caching
+3. **Cache Warming**: Pre-cache common questions during low-traffic periods
+4. **Monitoring**: Regular review of cache statistics and logs
+5. **User Experience**: Transparent cache indicators build trust

@@ -1,4 +1,4 @@
-// All initialization messages in a single array for random selection
+// All initialization messages for random selection
 export const allInitSteps = [
   // Set 1: Teaching AI basic help desk concepts
   { text: "Teaching AI that RTFM doesn't mean 'Read The Fun Manual'..." },
@@ -13,7 +13,6 @@ export const allInitSteps = [
   { text: "Preparing for users who skim instead of read..." },
   { text: "Buffering solutions to problems you didn't know existed..." },
   { text: "Finalizing the knowledge base optimization..." },
-  { text: "Ready to answer questions you didn't know you had!" },
 
   // Set 2: AI patience and understanding
   { text: "Convincing AI that 'Have you tried turning it off and on?' isn't always the answer..." },
@@ -28,7 +27,6 @@ export const allInitSteps = [
   { text: "Preparing responses that won't create more questions..." },
   { text: "Teaching machines to read between the lines..." },
   { text: "Optimizing for humans who hate reading manuals..." },
-  { text: "Ready to make documentation actually useful!" },
 
   // Set 3: Clear communication
   { text: "Explaining to AI why 'It depends' isn't a helpful answer..." },
@@ -43,7 +41,6 @@ export const allInitSteps = [
   { text: "Preparing for users who just want it to work..." },
   { text: "Teaching algorithms to predict what you really meant..." },
   { text: "Optimizing for clarity over technical accuracy..." },
-  { text: "Ready to turn confusion into clarity!" },
 
   // Set 4: Documentation and user behavior
   { text: "Initializing the 'Why Didn't You Google This First?' module..." },
@@ -58,7 +55,6 @@ export const allInitSteps = [
   { text: "Preparing responses for people who hate documentation..." },
   { text: "Loading solutions that work on the first try..." },
   { text: "Teaching machines the art of gentle guidance..." },
-  { text: "Ready to make support tickets a thing of the past!" },
 
   // Set 5: Practical support wisdom
   { text: "Uploading the 'Common Sense Isn't So Common' database..." },
@@ -73,20 +69,51 @@ export const allInitSteps = [
   { text: "Preparing for users who learn by doing, not reading..." },
   { text: "Loading solutions that prevent future problems..." },
   { text: "Teaching machines to anticipate follow-up questions..." },
-  { text: "Ready to be your friendly neighborhood know-it-all!" }
+
+  // Set 6: New humor and tech wit
+  { text: "Convincing machines that 'magic' isn't a valid error code..." },
+  { text: "Teaching AI that users click 'Yes' without reading..." },
+  { text: "Loading the 'Works on My Machine' translator..." },
+  { text: "Installing the universal 'Please Wait' patience generator..." },
+  { text: "Teaching systems that silence doesn't mean consent..." },
+  { text: "Preparing for the eternal 'Is it plugged in?' questions..." },
+  { text: "Loading responses for when users say 'It's broken'..." },
+  { text: "Installing the 'Define Broken' clarification protocol..." },
+  { text: "Teaching AI that screenshots of error messages help..." },
+  { text: "Buffering solutions for problems that solve themselves..." },
+  { text: "Preparing for users who restart everything except the problem..." },
+  { text: "Loading the 'Did You Save Your Work?' reminder system..." }
 ];
 
-// Function to randomly select a subset of steps for each loading session
-export const getRandomInitSteps = (count: number = 8) => {
-  const shuffled = [...allInitSteps].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
+// Advanced randomization function that ensures variety across sessions
+export const getRandomInitSteps = (count: number = 4) => {
+  // Always start with this specific AQu message
+  const aquMessage = { text: "Connecting to AQu Intelligence network..." };
+  
+  // Advanced shuffle algorithm for better randomization
+  const shuffledMessages = [...allInitSteps];
+  
+  // Fisher-Yates shuffle for true randomization
+  for (let i = shuffledMessages.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledMessages[i], shuffledMessages[j]] = [shuffledMessages[j], shuffledMessages[i]];
+  }
+  
+  // Select random messages ensuring no duplicates
+  const selectedMessages = [];
+  const usedIndices = new Set();
+  
+  while (selectedMessages.length < (count - 1) && selectedMessages.length < allInitSteps.length) {
+    const randomIndex = Math.floor(Math.random() * shuffledMessages.length);
+    if (!usedIndices.has(randomIndex)) {
+      usedIndices.add(randomIndex);
+      selectedMessages.push(shuffledMessages[randomIndex]);
+    }
+  }
+  
+  // Combine AQu step first, then randomly selected steps
+  return [aquMessage, ...selectedMessages];
 };
 
-// Legacy export for backward compatibility
-export const funnyInitSteps = [
-  allInitSteps.slice(0, 13),
-  allInitSteps.slice(13, 26),
-  allInitSteps.slice(26, 39),
-  allInitSteps.slice(39, 52),
-  allInitSteps.slice(52, 65)
-]; 
+// Function to get all messages for preview/testing
+export const getAllInitSteps = () => allInitSteps; 

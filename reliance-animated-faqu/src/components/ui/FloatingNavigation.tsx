@@ -1,7 +1,12 @@
 import React, { memo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { FileText, Brain, HelpCircle } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { 
+  File01Icon, 
+  Brain01Icon, 
+  HelpCircleIcon 
+} from "@hugeicons/core-free-icons";
 import { useTheme } from "@/hooks/useTheme";
 
 interface FloatingNavigationProps {
@@ -49,6 +54,33 @@ export const FloatingNavigation = memo(function FloatingNavigation({
     return `relative h-12 w-12 rounded-full border-2 transition-all duration-300 ${colorMap[baseColor as keyof typeof colorMap]} group transform hover:scale-110 shadow-md`;
   };
 
+  const navItems = [
+    {
+      icon: File01Icon,
+      label: 'Knowledge Base',
+      onClick: onPdfClick,
+      color: 'text-sky-600 dark:text-sky-400',
+      bgColor: 'bg-sky-50 dark:bg-sky-900/20',
+      hoverColor: 'hover:bg-sky-100 dark:hover:bg-sky-900/30'
+    },
+    {
+      icon: Brain01Icon,
+      label: 'Technical Info',
+      onClick: onAiInfoClick,
+      color: 'text-violet-600 dark:text-violet-400',
+      bgColor: 'bg-violet-50 dark:bg-violet-900/20',
+      hoverColor: 'hover:bg-violet-100 dark:hover:bg-violet-900/30'
+    },
+    {
+      icon: HelpCircleIcon,
+      label: 'Help Guide',
+      onClick: onHelpClick,
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-900/20',
+      hoverColor: 'hover:bg-emerald-100 dark:hover:bg-emerald-900/30'
+    }
+  ];
+
   return (
     <div 
       key={`floating-nav-${theme}`} // Force re-render on theme change
@@ -56,83 +88,40 @@ export const FloatingNavigation = memo(function FloatingNavigation({
       data-theme={theme} // Add data attribute for debugging
     >
       <div className={containerClasses}>
-        {/* PDF Viewer Button */}
-        <Tooltip key={`pdf-tooltip-${theme}`}>
-          <TooltipTrigger asChild>
-            <Button
-              key={`pdf-btn-${theme}`}
-              aria-label="View PDF (Ctrl+P)"
-              onClick={onPdfClick}
-              disabled={!isOnline}
-              className={`${buttonBaseClasses('blue')} ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
-              data-theme={theme}
-            >
-              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <FileText className={`h-6 w-6 transition-transform duration-300 group-hover:rotate-3 ${
-                isDark ? 'text-blue-400' : 'text-blue-500'
-              }`} />
-              {connectionStatus === 'connected' && (
-                <div className={`absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 ${
-                  isDark ? 'border-gray-900' : 'border-white'
-                }`} />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-center">
-              <p>View PDF Document</p>
-              <p className="text-xs text-gray-400">Ctrl+P</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* AI Info Button */}
-        <Tooltip key={`ai-tooltip-${theme}`}>
-          <TooltipTrigger asChild>
-            <Button
-              key={`ai-btn-${theme}`}
-              aria-label="AI System Information (Ctrl+I)"
-              onClick={onAiInfoClick}
-              className={buttonBaseClasses('purple')}
-              data-theme={theme}
-            >
-              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <Brain className={`h-6 w-6 transition-transform duration-300 group-hover:-rotate-3 ${
-                isDark ? 'text-purple-400' : 'text-purple-500'
-              }`} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-center">
-              <p>AQu Intelligent Engine</p>
-              <p className="text-xs text-gray-400">Ctrl+I</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Help Button */}
-        <Tooltip key={`help-tooltip-${theme}`}>
-          <TooltipTrigger asChild>
-            <Button
-              key={`help-btn-${theme}`}
-              aria-label="Help & How to Use (Ctrl+H)"
-              onClick={onHelpClick}
-              className={buttonBaseClasses('emerald')}
-              data-theme={theme}
-            >
-              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <HelpCircle className={`h-6 w-6 transition-transform duration-300 group-hover:rotate-3 ${
-                isDark ? 'text-emerald-400' : 'text-emerald-500'
-              }`} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-center">
-              <p>Help & How to Use</p>
-              <p className="text-xs text-gray-400">Ctrl+H</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
+        {navItems.map((item, index) => (
+          <Tooltip key={`${item.label}-tooltip-${theme}`}>
+            <TooltipTrigger asChild>
+              <Button
+                key={`${item.label}-btn-${theme}`}
+                aria-label={item.label}
+                onClick={item.onClick}
+                disabled={!isOnline}
+                className={`${buttonBaseClasses('blue')} ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+                data-theme={theme}
+              >
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <HugeiconsIcon 
+                  icon={item.icon}
+                  size={24}
+                  color="currentColor"
+                  strokeWidth={1.5}
+                  className={`transition-transform duration-300 group-hover:rotate-3 ${item.color}`}
+                />
+                {connectionStatus === 'connected' && (
+                  <div className={`absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 ${
+                    isDark ? 'border-gray-900' : 'border-white'
+                  }`} />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-center">
+                <p>{item.label}</p>
+                <p className="text-xs text-gray-400">Ctrl+{item.label.split(' ')[1]}</p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        ))}
       </div>
     </div>
   );

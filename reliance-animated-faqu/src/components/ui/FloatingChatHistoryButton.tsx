@@ -50,7 +50,7 @@ export const FloatingChatHistoryButton = memo(function FloatingChatHistoryButton
               data-theme={theme}
             >
               <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <History className={`h-5 w-5 transition-transform duration-300 group-hover:rotate-3 ${
+              <History className={`h-7 w-7 transition-transform duration-300 group-hover:rotate-3 ${
                 isDark ? 'text-blue-400' : 'text-blue-500'
               }`} />
               {chatHistoryLength > 0 && (

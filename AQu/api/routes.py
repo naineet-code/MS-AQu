@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import StreamingResponse, FileResponse
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 from core.ai_service import AIService
@@ -11,6 +12,11 @@ import tiktoken
 from nltk.tokenize import sent_tokenize
 import json
 from core.ai_credentials_check import ai_credentials_checker
+from core.cache_manager import RedisCacheManager
+import time
+import csv
+import io
+import datetime
 
 # Create router with explicit prefix
 router = APIRouter(prefix="/api", tags=["api"])
@@ -19,11 +25,13 @@ logger = get_logger(__name__)
 # Initialize services
 settings = Settings()
 ai_service = AIService()
+cache_manager = RedisCacheManager()
 
 class QueryRequest(BaseModel):
     query: str
     category: str
     pdf_name: Optional[str] = None
+    force_no_cache: Optional[bool] = False
 
 class AnalysisRequest(BaseModel):
     text: str
@@ -186,6 +194,7 @@ async def unified_rag(request: dict):
     try:
         query = request.get("query")
         category = request.get("category")
+        force_no_cache = request.get("force_no_cache", False)
         
         if not query or not category:
             raise HTTPException(status_code=400, detail="Query and category are required")
@@ -196,14 +205,16 @@ async def unified_rag(request: dict):
             raise HTTPException(status_code=404, detail=f"No content found for category: {category}")
         
         # Process the query using the AI service
-        result = ai_service.process_query(query, pdf_content)
+        result = ai_service.process_query(query, pdf_content, category, force_no_cache)
         
         if not result:
             return {
                 "answer": "Could not generate an answer due to missing context from selected paragraphs.",
                 "reasoning": "",
                 "relevant_paragraphs": [],
-                "cost": 0.0
+                "cost": 0.0,
+                "cache_hit": False,
+                "forced_no_cache": force_no_cache
             }
         
         return result
@@ -254,9 +265,40 @@ async def refresh_pdfs() -> Dict:
 
 @router.get("/ai-status")
 async def get_ai_status() -> Dict:
-    """Get AI credentials and connectivity status."""
+    """Get AI credentials, connectivity status, and cache statistics."""
     try:
-        status = ai_credentials_checker.check_all_credentials()
+        # Get AI credentials status
+        ai_status = ai_credentials_checker.check_all_credentials()
+        
+        # Get cache statistics
+        cache_stats = cache_manager.get_cache_stats()
+        
+        # Get Redis connection status
+        redis_status = {
+            "connected": cache_manager.redis_client is not None,
+            "host": settings.get("REDIS_HOST", "localhost"),
+            "port": settings.get("REDIS_PORT", 6379),
+            "db": settings.get("REDIS_DB", 0),
+            "cache_ttl": settings.get("CACHE_TTL", 3600),
+            "similarity_threshold": settings.get("CACHE_SIMILARITY_THRESHOLD", 0.85)
+        }
+        
+        # Combine all status information
+        status = {
+            "ai_credentials": ai_status,
+            "cache": {
+                "status": cache_stats,
+                "redis": redis_status,
+                "features": {
+                    "semantic_caching": True,
+                    "answer_verification": True,
+                    "cache_ttl_enabled": True,
+                    "similarity_threshold": settings.get("CACHE_SIMILARITY_THRESHOLD", 0.85)
+                }
+            },
+            "timestamp": time.time()
+        }
+        
         return status
     except Exception as e:
         logger.error(f"Error checking AI status: {str(e)}")
@@ -266,4 +308,133 @@ async def get_ai_status() -> Dict:
 @router.get("/pricing")
 def get_pricing():
     with open("config/config.json") as f:
-        return json.load(f)["MODEL_PRICING"] 
+        return json.load(f)["MODEL_PRICING"]
+
+@router.get("/download-question-logs")
+async def download_question_logs():
+    """Download question logs and cache entries as a CSV file."""
+    try:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        writer.writerow([
+            "Timestamp", "Question", "Category", "Cache Hit", "Response Time (ms)", 
+            "Total Cost", "Answer Summary", "Reasoning Summary", "Similarity Score", 
+            "Confidence Score", "Forced No Cache"
+        ])
+        
+        # Read question logs from file
+        try:
+            with open("question_log.jsonl", "r") as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            log_entry = json.loads(line.strip())
+                            writer.writerow([
+                                log_entry.get("timestamp", ""),
+                                log_entry.get("question", ""),
+                                log_entry.get("category", ""),
+                                log_entry.get("cache_hit", False),
+                                log_entry.get("response_time_ms", 0),
+                                log_entry.get("cost", 0),
+                                log_entry.get("answer_summary", "")[:200] + "..." if len(log_entry.get("answer_summary", "")) > 200 else log_entry.get("answer_summary", ""),
+                                log_entry.get("reasoning_summary", "")[:200] + "..." if len(log_entry.get("reasoning_summary", "")) > 200 else log_entry.get("reasoning_summary", ""),
+                                log_entry.get("similarity_score", ""),
+                                log_entry.get("confidence_score", ""),
+                                log_entry.get("forced_no_cache", False)
+                            ])
+                        except json.JSONDecodeError:
+                            continue
+        except FileNotFoundError:
+            logger.warning("Question log file not found")
+        
+        # Add cache entries section
+        writer.writerow([])  # Empty row for separation
+        writer.writerow(["=== CACHE ENTRIES ==="])
+        writer.writerow([
+            "Cache Key", "Original Query", "Cached At", "Answer Preview", 
+            "Embedding Cost", "TTL (seconds)"
+        ])
+        
+        cache_entries = cache_manager.get_cache_entries_for_export()
+        for entry in cache_entries:
+            cached_at_formatted = datetime.datetime.fromtimestamp(entry.get('cached_at', 0)).isoformat() if entry.get('cached_at') else ""
+            writer.writerow([
+                entry.get('cache_key', ''),
+                entry.get('original_query', ''),
+                cached_at_formatted,
+                entry.get('answer_preview', ''),
+                entry.get('embedding_cost', 0),
+                entry.get('ttl', 0)
+            ])
+        
+        output.seek(0)
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Create filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"aqu_logs_and_cache_{timestamp}.csv"
+        
+        return StreamingResponse(
+            io.BytesIO(csv_content.encode('utf-8')),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error downloading question logs: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/clear-cache")
+async def clear_cache():
+    """Clear the Redis cache."""
+    try:
+        success = cache_manager.clear_cache()
+        if success:
+            return {"message": "Cache cleared successfully", "success": True}
+        else:
+            return {"message": "Failed to clear cache", "success": False}
+    except Exception as e:
+        logger.error(f"Error clearing cache: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/get-knowledge-base-pdf")
+async def get_knowledge_base_pdf():
+    """Serve the first available PDF from the knowledge base."""
+    try:
+        # Get the first available PDF from any category
+        if not pdf_manager.pdf_cache:
+            logger.error("No PDFs available in cache")
+            raise HTTPException(
+                status_code=404, 
+                detail="No PDF documents available in the knowledge base"
+            )
+        
+        # Get the first PDF from the cache
+        first_pdf_name = next(iter(pdf_manager.pdf_cache.keys()))
+        pdf_info = pdf_manager.pdf_cache[first_pdf_name]
+        pdf_path = Path(pdf_info['path'])
+        
+        if not pdf_path.exists():
+            logger.error(f"PDF file not found: {pdf_path}")
+            raise HTTPException(status_code=404, detail="PDF file not found")
+        
+        logger.info(f"Serving PDF inline: {pdf_path}")
+        return FileResponse(
+            path=str(pdf_path),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "inline",
+                "Content-Transfer-Encoding": "binary",
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=3600",
+                "X-Content-Type-Options": "nosniff"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error serving knowledge base PDF: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e)) 

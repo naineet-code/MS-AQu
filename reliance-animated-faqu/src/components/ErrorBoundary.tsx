@@ -132,7 +132,7 @@ class ErrorBoundary extends Component<Props, State> {
                       className="flex items-center gap-2"
                       variant="default"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <RefreshCw className="h-5 w-5" />
                       Refresh Page
                     </Button>
                     
@@ -141,7 +141,7 @@ class ErrorBoundary extends Component<Props, State> {
                       className="flex items-center gap-2"
                       variant="outline"
                     >
-                      <Home className="h-4 w-4" />
+                      <Home className="h-5 w-5" />
                       Go Home
                     </Button>
                     
@@ -150,7 +150,7 @@ class ErrorBoundary extends Component<Props, State> {
                       className="flex items-center gap-2"
                       variant="secondary"
                     >
-                      <Bug className="h-4 w-4" />
+                      <Bug className="h-5 w-5" />
                       Report Issue
                     </Button>
                   </div>

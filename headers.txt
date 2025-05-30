@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+date: Fri, 30 May 2025 22:18:10 GMT
+server: uvicorn
+content-disposition: inline
+content-transfer-encoding: binary
+accept-ranges: bytes
+cache-control: public, max-age=3600
+x-content-type-options: nosniff
+content-type: application/pdf
+content-length: 846327
+last-modified: Thu, 29 May 2025 04:00:23 GMT
+etag: "cc51ba002a1f3708647c85a4972cce8c"
+

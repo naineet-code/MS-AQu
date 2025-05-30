@@ -1,12 +1,13 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ArrowDown } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { FunnySearchLoader } from "@/components/ui/funny-search-loader";
 import ResponseCard from "./ResponseSection";
 import { useTheme } from "@/hooks/useTheme";
 import { ButtonTextHoverEffect } from "@/components/ui/button-text-hover-effect";
+import ResponseScrollHint from "./ResponseScrollHint";
 
 interface QuestionResponseSectionProps {
   question: string;
@@ -15,6 +16,8 @@ interface QuestionResponseSectionProps {
   loading: boolean;
   responseData: any;
   backendUrl: string | null;
+  onForceNoCache?: () => void;
+  hasUserInteracted: boolean;
 }
 
 const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
@@ -23,10 +26,15 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
   onNewQuestion,
   loading,
   responseData,
-  backendUrl
+  backendUrl,
+  onForceNoCache,
+  hasUserInteracted
 }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const [shouldShowScrollHint, setShouldShowScrollHint] = React.useState(false);
+  const responseContainerRef = React.useRef<HTMLDivElement>(null);
+  const [hasScrolled, setHasScrolled] = React.useState(false);
 
   console.log('🔍 QuestionResponseSection render:', { 
     question, 
@@ -35,10 +43,117 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
     responseData, 
     backendUrl,
     hasResponseData: !!responseData,
-    responseDataKeys: responseData ? Object.keys(responseData) : []
+    responseDataKeys: responseData ? Object.keys(responseData) : [],
+    hasForceNoCacheHandler: !!onForceNoCache,
+    hasUserInteracted
   });
 
   if (!isVisible) return null;
+
+  React.useEffect(() => {
+    let hintTimeout: ReturnType<typeof setTimeout>;
+    let checkScrollTimeout: ReturnType<typeof setTimeout>;
+
+    const checkScrollNeeded = () => {
+      const container = responseContainerRef.current;
+      if (container) {
+        const isScrollable = container.scrollHeight > container.clientHeight + 50; // 50px buffer
+        const isNotAtBottom = container.scrollTop + container.clientHeight < container.scrollHeight - 10;
+        
+        if (isScrollable && isNotAtBottom && !hasScrolled && !hasUserInteracted) {
+          setShouldShowScrollHint(true);
+        } else {
+          setShouldShowScrollHint(false);
+        }
+      }
+    };
+
+    const handleScroll = (e: Event) => {
+      const container = responseContainerRef.current;
+      if (container && e.target === container) {
+        const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+        if (isAtBottom) {
+          setHasScrolled(true);
+          setShouldShowScrollHint(false);
+        } else if (container.scrollTop > 30) {
+          setHasScrolled(true);
+          setShouldShowScrollHint(false);
+        }
+      }
+    };
+
+    if (!loading && responseData && responseData.answer) {
+      // Initial check after content loads
+      checkScrollTimeout = setTimeout(checkScrollNeeded, 1000);
+
+      // Monitor for content changes
+      const observer = new ResizeObserver(() => {
+        clearTimeout(checkScrollTimeout);
+        checkScrollTimeout = setTimeout(checkScrollNeeded, 500);
+      });
+
+      const container = responseContainerRef.current;
+      if (container) {
+        observer.observe(container);
+        container.addEventListener('scroll', handleScroll);
+      }
+
+      return () => {
+        clearTimeout(hintTimeout);
+        clearTimeout(checkScrollTimeout);
+        if (container) {
+          observer.disconnect();
+          container.removeEventListener('scroll', handleScroll);
+        }
+      };
+    }
+  }, [loading, responseData, hasUserInteracted, hasScrolled]);
+
+  React.useEffect(() => {
+    if (hasUserInteracted) {
+      setShouldShowScrollHint(false);
+    }
+  }, [hasUserInteracted]);
+
+  if (loading) {
+    return (
+      <motion.div
+        className="w-full"
+        initial={{ opacity: 0, y: 40, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 40, scale: 0.98 }}
+        transition={{ duration: 0.5, ease: 'easeInOut' }}
+        style={{ position: 'relative', zIndex: 30 }}
+      >
+        <div className="w-full flex justify-center items-center min-h-[400px]">
+          <div className="w-full max-w-2xl mx-auto">
+            <FunnySearchLoader isSearching={loading} />
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (!responseData || !responseData.answer) {
+    return (
+      <motion.div
+        className="w-full"
+        initial={{ opacity: 0, y: 40, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 40, scale: 0.98 }}
+        transition={{ duration: 0.5, ease: 'easeInOut' }}
+        style={{ position: 'relative', zIndex: 30 }}
+      >
+        <div className="w-full flex justify-center items-center p-12">
+          <div className="text-center">
+            <p className={`text-lg ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+              Unable to generate response. Please try again.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -73,8 +188,7 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
           </motion.p>
           <motion.div layoutId="new-question-btn">
             <Button
-              onClick={onNewQuestion}
-              variant="outline"
+              variant="ghost"
               size="lg"
               className={`group rounded-full transition-all duration-300 px-6 py-3 min-h-[48px] w-auto min-w-[160px] relative overflow-hidden ${
                 isDark 
@@ -82,6 +196,7 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
                   : 'bg-white/20 border-white/20 hover:bg-white/40 text-zinc-800 hover:border-emerald-500/50'
               }`}
               style={{ pointerEvents: 'auto' }}
+              onClick={onNewQuestion}
             >
               {/* Enhanced button background with gradient on hover */}
               <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
@@ -127,46 +242,46 @@ const QuestionResponseSection: React.FC<QuestionResponseSectionProps> = ({
         <Separator className={`my-4 ${isDark ? 'bg-white/20' : 'bg-black/20'}`} />
       </motion.div>
 
-      {/* Response Content as a bottom drawer */}
-      <AnimatePresence mode="wait">
-        {loading ? (
-          <motion.div
-            key="loader"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
-            transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="w-full flex justify-center items-center"
-            style={{ minHeight: 220 }}
-          >
-            <FunnySearchLoader isSearching={loading} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="drawer"
-            initial={{ opacity: 0, y: 80, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 80, scale: 0.98 }}
-            transition={{ duration: 0.6, ease: 'easeInOut' }}
-            className="w-full"
-            style={{
-              boxShadow: isDark
-                ? '0 12px 32px 0 rgba(31, 38, 135, 0.25), 0 1.5px 8px 0 rgba(255,255,255,0.08) inset'
-                : '0 12px 32px 0 rgba(31, 38, 135, 0.10), 0 1.5px 8px 0 rgba(0,0,0,0.04) inset',
-              borderRadius: 24,
-              background: isDark
-                ? 'linear-gradient(120deg, rgba(30,41,59,0.95) 60%, rgba(59,130,246,0.10) 100%)'
-                : 'linear-gradient(120deg, rgba(255,255,255,0.95) 60%, rgba(199,210,254,0.10) 100%)',
-              backdropFilter: 'blur(18px)',
-              WebkitBackdropFilter: 'blur(18px)',
-              marginBottom: 32,
-              padding: 0,
-            }}
-          >
-            <ResponseCard data={responseData} backendUrl={backendUrl} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Response Content */}
+      <motion.div
+        key="drawer"
+        initial={{ opacity: 0, y: 80, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 80, scale: 0.98 }}
+        transition={{ duration: 0.6, ease: 'easeInOut' }}
+        className="w-full"
+        style={{
+          boxShadow: isDark
+            ? '0 12px 32px 0 rgba(31, 38, 135, 0.25), 0 1.5px 8px 0 rgba(255,255,255,0.08) inset'
+            : '0 12px 32px 0 rgba(31, 38, 135, 0.10), 0 1.5px 8px 0 rgba(0,0,0,0.04) inset',
+          borderRadius: 24,
+          background: isDark
+            ? 'linear-gradient(120deg, rgba(30,41,59,0.95) 60%, rgba(59,130,246,0.10) 100%)'
+            : 'linear-gradient(120deg, rgba(255,255,255,0.95) 60%, rgba(199,210,254,0.10) 100%)',
+          backdropFilter: 'blur(18px)',
+          WebkitBackdropFilter: 'blur(18px)',
+          marginBottom: 32,
+          padding: 0,
+        }}
+        ref={responseContainerRef}
+      >
+        <ResponseCard 
+          data={responseData} 
+          backendUrl={backendUrl} 
+          onForceNoCache={onForceNoCache} 
+          showScrollHint={shouldShowScrollHint}
+          onScroll={(isAtBottom) => {
+            if (isAtBottom) {
+              setHasScrolled(true);
+              setShouldShowScrollHint(false);
+            }
+          }}
+        />
+        <ResponseScrollHint 
+          containerRef={responseContainerRef}
+          isVisible={shouldShowScrollHint}
+        />
+      </motion.div>
     </motion.div>
   );
 };

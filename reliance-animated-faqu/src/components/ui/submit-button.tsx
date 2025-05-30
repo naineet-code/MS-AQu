@@ -59,7 +59,7 @@ export function SubmitButton({ isDisabled, isPressed, buttonState }: SubmitButto
         disabled={isDisabled}
         type="submit"
         className={cn(
-          "z-20 inline-flex items-center justify-center h-8 w-8 rounded-full",
+          "z-20 inline-flex items-center justify-center h-10 w-10 rounded-full",
           "disabled:bg-gray-100 dark:disabled:bg-zinc-800",
           "bg-gradient-to-r", gradient,
           "transition-all duration-300 hover:shadow-lg backdrop-blur-sm dark:backdrop-blur-md pointer-events-auto",
@@ -134,7 +134,7 @@ export function SubmitButton({ isDisabled, isPressed, buttonState }: SubmitButto
           >
             <Icon 
               className={cn(
-                "text-white h-4 w-4",
+                "text-white h-6 w-6",
                 isPressed && 'animate-spin',
                 !isPressed && animation,
                 buttonState === 'active' && !isPressed && 'animate-pulse',

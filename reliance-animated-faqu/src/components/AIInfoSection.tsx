@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
@@ -62,6 +62,10 @@ export function AIInfoSection({ isOpen, onClose }: AIInfoSectionProps) {
           <DialogTitle className={`text-xl font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
             🧠 AQu AI System Information
           </DialogTitle>
+          {/* Hidden description for accessibility */}
+          <DialogDescription className="sr-only">
+            Detailed information about the AQu AI system including multi-model architecture, cost calculation, pricing details, and system capabilities.
+          </DialogDescription>
           <DialogClose asChild>
             <Button 
               size="icon" 

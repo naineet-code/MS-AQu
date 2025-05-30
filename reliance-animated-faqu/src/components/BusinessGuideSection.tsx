@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogClose, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -245,6 +245,14 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl w-[80vw] h-[88vh] p-0 gap-0 overflow-hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-gray-200/50 dark:border-gray-700/50">
+        {/* Hidden title for accessibility */}
+        <DialogTitle className="sr-only">
+          Business User Guide
+        </DialogTitle>
+        {/* Hidden description for accessibility */}
+        <DialogDescription className="sr-only">
+          Comprehensive guide for using AQu effectively in business contexts. Learn best practices, advanced applications, and get answers to common questions.
+        </DialogDescription>
         {/* Header */}
         <motion.div 
           className="relative px-6 py-4 border-b border-gray-200/30 dark:border-gray-700/30"
@@ -254,8 +262,8 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20">
-                <Lightbulb className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20">
+                <Lightbulb className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -361,8 +369,8 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                         transition={{ duration: 0.4 }}
                         className="flex items-center gap-3 mb-4"
                       >
-                        <div className="p-2 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20">
-                          <div className="text-blue-600 dark:text-blue-400">
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20">
+                          <div className="text-amber-600 dark:text-amber-400">
                             {guideSections.find(s => s.id === activeSection)?.icon}
                           </div>
                         </div>
@@ -385,7 +393,7 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                       transition={{ delay: 0.1 }}
                     >
                       <div className="flex items-center gap-2 mb-4">
-                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                           Key Points
                         </h3>
@@ -417,7 +425,7 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                       transition={{ delay: 0.2 }}
                     >
                       <div className="flex items-center gap-2 mb-4">
-                        <Briefcase className="w-4 h-4 text-purple-500" />
+                        <Briefcase className="w-4 h-4 text-violet-600" />
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                           Common Uses
                         </h3>
@@ -436,7 +444,7 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                               <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                                 {useCase.title}
                               </h4>
-                              <span className="px-2 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-md">
+                              <span className="px-2 py-1 text-xs font-medium bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-md">
                                 {useCase.industry}
                               </span>
                             </div>
@@ -456,7 +464,7 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                       transition={{ delay: 0.3 }}
                     >
                       <div className="flex items-center gap-2 mb-4">
-                        <Lightbulb className="w-4 h-4 text-orange-500" />
+                        <Lightbulb className="w-4 h-4 text-amber-600" />
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                           Helpful Tips
                         </h3>
@@ -469,7 +477,7 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ delay: 0.3 + index * 0.05 }}
-                            className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-lg border border-orange-200/30 dark:border-orange-800/30"
+                            className="p-3 bg-amber-50/50 dark:bg-amber-900/10 rounded-lg border border-amber-200/30 dark:border-amber-800/30"
                           >
                             <p className="text-sm text-gray-700 dark:text-gray-300">
                               {tip}
@@ -487,7 +495,7 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                       transition={{ delay: 0.4 }}
                     >
                       <div className="flex items-center gap-2 mb-4">
-                        <Star className="w-4 h-4 text-emerald-500" />
+                        <Star className="w-4 h-4 text-emerald-600" />
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                           Benefits
                         </h3>
@@ -502,7 +510,7 @@ export function BusinessGuideSection({ isOpen, onClose }: BusinessGuideSectionPr
                             transition={{ delay: 0.4 + index * 0.05 }}
                             className="flex items-start gap-2 py-2"
                           >
-                            <CheckCircle className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                             <p className="text-sm text-gray-700 dark:text-gray-300">
                               {benefit}
                             </p>

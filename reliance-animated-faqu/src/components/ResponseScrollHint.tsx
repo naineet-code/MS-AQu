@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ArrowDown } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 
 interface ResponseScrollHintProps {
@@ -27,7 +27,7 @@ const ResponseScrollHint: React.FC<ResponseScrollHintProps> = ({ containerRef, i
           if (!hasScrolled) {
             setShowHint(true);
           }
-        }, 2000); // Professional timing
+        }, 2500); // Slightly longer to ensure content is ready
       }
     };
 
@@ -65,77 +65,120 @@ const ResponseScrollHint: React.FC<ResponseScrollHintProps> = ({ containerRef, i
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 20, scale: 0.8 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.8 }}
         transition={{ 
-          duration: 0.4, 
+          duration: 0.6, 
           ease: "easeOut"
         }}
-        className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none"
+        className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none"
       >
-        {/* Sleek modern container */}
+        {/* Main nudge container with enhanced animations */}
         <motion.div 
-          className={`relative flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border ${
+          className={`relative flex flex-col items-center gap-1 px-6 py-3 rounded-full backdrop-blur-xl border-2 ${
             isDark 
-              ? 'border-gray-600/60 text-gray-200' 
-              : 'border-blue-200/70 text-blue-800'
+              ? 'border-blue-400/70 text-blue-200 shadow-blue-500/20' 
+              : 'border-blue-500/80 text-blue-700 shadow-blue-500/30'
           }`}
           style={{
             background: isDark
-              ? 'linear-gradient(135deg, rgba(71, 85, 105, 0.92) 0%, rgba(100, 116, 139, 0.88) 30%, rgba(148, 163, 184, 0.85) 50%, rgba(100, 116, 139, 0.88) 70%, rgba(71, 85, 105, 0.92) 100%)'
-              : 'linear-gradient(135deg, rgba(232, 249, 255, 0.98) 0%, rgba(240, 244, 255, 0.95) 20%, rgba(249, 232, 255, 0.93) 40%, rgba(232, 249, 255, 0.90) 60%, rgba(255, 249, 232, 0.93) 80%, rgba(232, 249, 255, 0.98) 100%)',
+              ? 'linear-gradient(135deg, rgba(30, 58, 138, 0.95) 0%, rgba(59, 130, 246, 0.90) 30%, rgba(99, 102, 241, 0.85) 50%, rgba(59, 130, 246, 0.90) 70%, rgba(30, 58, 138, 0.95) 100%)'
+              : 'linear-gradient(135deg, rgba(239, 246, 255, 0.98) 0%, rgba(219, 234, 254, 0.95) 20%, rgba(191, 219, 254, 0.93) 40%, rgba(147, 197, 253, 0.90) 60%, rgba(59, 130, 246, 0.93) 80%, rgba(147, 197, 253, 0.98) 100%)',
             boxShadow: isDark
-              ? '0 8px 25px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(255, 255, 255, 0.08) inset, 0 1px 0 rgba(255, 255, 255, 0.12) inset'
-              : '0 8px 25px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(232, 249, 255, 0.9) inset, 0 1px 0 rgba(255, 255, 255, 1) inset'
+              ? '0 12px 35px rgba(59, 130, 246, 0.25), 0 4px 15px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(255, 255, 255, 0.1) inset'
+              : '0 12px 35px rgba(59, 130, 246, 0.20), 0 4px 15px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(255, 255, 255, 0.9) inset'
           }}
           animate={{
-            y: [0, -2, 0]
+            y: [0, -8, 0],
+            scale: [1, 1.05, 1]
+          }}
+          transition={{
+            duration: 2.5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          {/* Enhanced text with subtle animation */}
+          <motion.span 
+            className="text-sm font-semibold tracking-wide"
+            animate={{
+              opacity: [0.8, 1, 0.8]
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            More content below
+          </motion.span>
+          
+          {/* Dual arrow animation for stronger visual cue */}
+          <div className="flex flex-col items-center -space-y-1">
+            <motion.div
+              animate={{ 
+                y: [0, 4, 0],
+                opacity: [0.4, 1, 0.4]
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity, 
+                ease: "easeInOut",
+                delay: 0
+              }}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </motion.div>
+            <motion.div
+              animate={{ 
+                y: [0, 4, 0],
+                opacity: [0.4, 1, 0.4]
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity, 
+                ease: "easeInOut",
+                delay: 0.3
+              }}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </motion.div>
+          </div>
+        </motion.div>
+        
+        {/* Enhanced pulsing glow effect */}
+        <motion.div
+          className="absolute inset-0 rounded-full -z-10"
+          animate={{
+            opacity: [0.2, 0.4, 0.2],
+            scale: [1, 1.3, 1]
           }}
           transition={{
             duration: 3,
             repeat: Infinity,
             ease: "easeInOut"
           }}
-        >
-          {/* Professional text */}
-          <span className="text-xs font-medium tracking-wide">
-            Scroll for more
-          </span>
-          
-          {/* Elegant chevron animation */}
-          <motion.div
-            animate={{ 
-              y: [0, 2, 0],
-              opacity: [0.6, 1, 0.6]
-            }}
-            transition={{ 
-              duration: 2, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
-            }}
-          >
-            <ChevronDown className="h-3 w-3" />
-          </motion.div>
-        </motion.div>
-        
-        {/* Subtle glow effect */}
-        <motion.div
-          className="absolute inset-0 rounded-full -z-10"
-          animate={{
-            opacity: [0.15, 0.25, 0.15]
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
           style={{
             background: isDark 
-              ? 'radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, rgba(59, 130, 246, 0.15) 40%, rgba(147, 51, 234, 0.1) 70%, transparent 100%)' 
-              : 'radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(99, 102, 241, 0.08) 40%, rgba(147, 197, 253, 0.06) 70%, transparent 100%)',
-            filter: 'blur(12px)',
-            transform: 'scale(1.8)'
+              ? 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, rgba(99, 102, 241, 0.3) 30%, rgba(147, 51, 234, 0.2) 60%, transparent 100%)' 
+              : 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(99, 102, 241, 0.2) 30%, rgba(147, 197, 253, 0.15) 60%, transparent 100%)',
+            filter: 'blur(15px)',
+            transform: 'scale(2)'
+          }}
+        />
+
+        {/* Additional subtle ring animation */}
+        <motion.div
+          className="absolute inset-0 rounded-full border-2 border-blue-400/30 -z-5"
+          animate={{
+            scale: [1, 1.5, 1],
+            opacity: [0.6, 0, 0.6]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeOut"
           }}
         />
       </motion.div>

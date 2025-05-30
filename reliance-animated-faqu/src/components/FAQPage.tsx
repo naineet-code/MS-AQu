@@ -1,31 +1,47 @@
-import React, { useState, useEffect } from "react";
-import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
-import { MultiStepLoader } from "@/components/ui/multi-step-loader";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageTitle from "./PageTitle";
 import ChatInputSection from "./ChatInputSection";
-import { Dialog, DialogTrigger, DialogContent, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-// PDF and control icons
-import { FileText, X, ExternalLink, RotateCcw, History, ChevronDown, ChevronUp, Trash2, HelpCircle, Loader2, Brain, Terminal, Lightbulb } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import ChatHistory from "./ChatHistory";
 import { useChatHistory } from "@/hooks/useChatHistory";
 import { useTheme } from "@/hooks/useTheme";
 import QuestionResponseSection from "./QuestionResponseSection";
-import { marked } from 'marked';
-import { aiFormatter } from '@/utils/aiFormatter';
-import HelpScreen from "./HelpScreen";
-import { loadBackendUrl } from "@/config";
-import { TechnicalInfoSection } from './TechnicalInfoSection';
-import { BusinessGuideSection } from './BusinessGuideSection';
 import { useChatState } from '@/hooks/useChatState';
 import { usePdfDialog } from '@/hooks/usePdfDialog';
 import { getRandomInitSteps } from '@/data/initializationSteps';
 import { useBackendApi } from '@/hooks/useBackendApi';
 import { useLoaderControl } from '@/hooks/useLoaderControl';
+import { loadBackendUrl } from "@/config";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { 
+  CommandIcon, 
+  IdeaIcon, 
+  ClockIcon,
+  File01Icon 
+} from "@hugeicons/core-free-icons";
+
+// Import critical components directly (not lazy) to prevent layout issues
+import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
+import { FloatingDock } from "@/components/ui/floating-dock";
+
+// Lazy load only non-critical heavy components for better performance
+const PageLoadTypingAnimation = lazy(() => import("@/components/ui/page-load-typing-animation").then(module => ({ default: module.PageLoadTypingAnimation })));
+const HelpScreen = lazy(() => import('./HelpScreen'));
+const TechnicalInfoSection = lazy(() => import('./TechnicalInfoSection').then(module => ({ default: module.TechnicalInfoSection })));
+const BusinessGuideSection = lazy(() => import('./BusinessGuideSection').then(module => ({ default: module.BusinessGuideSection })));
+const SimplePdfViewer = lazy(() => import('./SimplePdfViewer').then(module => ({ default: module.default })));
+
+// Loading fallback component
+const ComponentLoader = () => (
+  <div className="flex items-center justify-center p-4">
+    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+  </div>
+);
 
 export default function FAQPage() {
+  // Chat state management
   const {
     isInputFocused,
     setIsInputFocused,
@@ -45,6 +61,7 @@ export default function FAQPage() {
     handleNewQuestion
   } = useChatState();
 
+  // PDF dialog state - simplified since new component handles everything
   const {
     showPdfDialog,
     setShowPdfDialog,
@@ -56,6 +73,7 @@ export default function FAQPage() {
     handlePdfLoad
   } = usePdfDialog();
 
+  // Backend API state
   const {
     loading,
     setLoading,
@@ -63,88 +81,39 @@ export default function FAQPage() {
     setResponseData,
     error,
     setError,
-    handleSubmitQuestion
+    handleSubmitQuestion,
+    handleForceNoCache
   } = useBackendApi();
 
+  // Other hooks
   const { shouldShowLoader, temporarilyDisableLoader } = useLoaderControl();
   const { chatHistory, clearHistory } = useChatHistory();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+
+  // Core state - simplified
+  const [showTypingAnimation, setShowTypingAnimation] = useState(true);
+  const [showMainContent, setShowMainContent] = useState(false);
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
+  
+  // Dialog states
   const [showChatHistory, setShowChatHistory] = useState(false);
-  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
-  
-  // Simple initialization state
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [initializationSteps] = useState(getRandomInitSteps());
   const [showHelpScreen, setShowHelpScreen] = useState(false);
-  const [backendUrl, setBackendUrl] = useState<string | null>(null);
-  const [configError, setConfigError] = useState<string | null>(null);
-  
-  // New section states
   const [showTechnicalInfo, setShowTechnicalInfo] = useState(false);
   const [showBusinessGuide, setShowBusinessGuide] = useState(false);
+  
+  // System initialization
+  const [backendUrl, setBackendUrl] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string>("");
+  const [isSystemReady, setIsSystemReady] = useState(false);
+  const [initializationSteps] = useState(getRandomInitSteps());
+  // Generate messages for initial typing animation from the same source
+  const [typingMessages] = useState(() => {
+    const steps = getRandomInitSteps();
+    return steps.map(step => step.text);
+  });
 
-  // Effect to close chat history when PDF viewer or guides are opened
-  useEffect(() => {
-    if (showPdfDialog || showHelpScreen || showTechnicalInfo || showBusinessGuide) {
-      setShowChatHistory(false);
-    }
-  }, [showPdfDialog, showHelpScreen, showTechnicalInfo, showBusinessGuide]);
-
-  // Global click handler to reset chat position when clicking outside
-  useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent) => {
-      setTimeout(() => {
-        const target = e.target as HTMLElement;
-        const chatContainer = document.querySelector('[data-chat-container]');
-        const isClickingChat = chatContainer?.contains(target);
-        const isClickingNewQuestionButton = target.closest('button')?.textContent?.includes('New Question');
-        
-        if (!isClickingChat && !isClickingNewQuestionButton && isReturnedFromResponse && !isInputFocused) {
-          setIsReturnedFromResponse(false);
-        }
-      }, 50);
-    };
-
-    document.addEventListener('click', handleGlobalClick);
-    return () => document.removeEventListener('click', handleGlobalClick);
-  }, [isReturnedFromResponse, isInputFocused]);
-
-  // Simple initialization logic
-  useEffect(() => {
-    // Set a maximum initialization time of 3 seconds
-    const maxInitTime = setTimeout(() => {
-      setIsInitializing(false);
-    }, 3000);
-
-    const initializeSystem = async () => {
-      try {
-        if (backendUrl) {
-          await fetch(`${backendUrl}/api/refresh-pdfs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-      } catch (err) {
-        console.error('Error loading PDF:', err);
-      } finally {
-        // Always finish initialization after a short delay
-        setTimeout(() => {
-          setIsInitializing(false);
-          clearTimeout(maxInitTime);
-        }, 2000);
-      }
-    };
-    
-    initializeSystem();
-
-    // Cleanup function
-    return () => {
-      clearTimeout(maxInitTime);
-    };
-  }, [backendUrl]);
-
-  // Load backend URL from TOML config with fallback
+  // Load backend URL
   useEffect(() => {
     loadBackendUrl()
       .then((url) => {
@@ -153,520 +122,459 @@ export default function FAQPage() {
       .catch((err) => {
         console.warn('Backend URL loading failed:', err.message);
         setConfigError(err.message);
-        // Don't let this prevent the app from loading
-        setTimeout(() => {
-          setIsInitializing(false);
-        }, 1000);
+        setIsSystemReady(true);
       });
   }, []);
 
-  // Safety fallback - ensure app always loads within 5 seconds maximum
+  // System initialization
   useEffect(() => {
-    const safetyTimeout = setTimeout(() => {
-      setIsInitializing(false);
-    }, 5000);
+    const initializeSystem = async () => {
+      if (backendUrl === null && !configError) return;
 
-    return () => clearTimeout(safetyTimeout);
-  }, []);
+      if (configError) {
+        return;
+      }
+      
+      try {
+        if (backendUrl) {
+          await fetch(`${backendUrl}/api/refresh-pdfs`, { method: 'POST' });
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (e) {
+        console.warn("Initialization step failed:", e);
+      } finally {
+        setIsSystemReady(true);
+      }
+    };
 
-  // Handle theme change to prevent loader
-  const handleThemeChange = () => {
-    temporarilyDisableLoader();
+    if (backendUrl !== null || configError) {
+      initializeSystem();
+    }
+  }, [backendUrl, configError]);
+
+  // Global click handler for chat position reset
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      // Don't interfere with input focus events - let them handle the state properly
+      const target = e.target as HTMLElement;
+      
+      // Check if clicking on input or related elements
+      const isClickingInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isClickingInputContainer = target.closest('form') || target.closest('[class*="placeholder"]') || target.closest('[class*="input"]');
+      
+      // If clicking on input-related elements, don't reset focus
+      if (isClickingInput || isClickingInputContainer) {
+        return;
+      }
+      
+      setTimeout(() => {
+        const chatContainer = document.querySelector('[data-chat-container]');
+        const isClickingChat = chatContainer?.contains(target);
+        const isClickingNewQuestionButton = target.closest('button')?.textContent?.includes('New Question');
+        const isClickingFloatingDock = target.closest('[class*="floating"]') || target.closest('.fixed.bottom');
+        
+        // Only reset chat states when clearly clicking outside the chat area
+        if (!isClickingChat && !isClickingNewQuestionButton && !isClickingFloatingDock && questionMode) {
+          // Only reset focus if the input is not actually focused
+          const activeElement = document.activeElement;
+          const isInputCurrentlyFocused = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+          
+          if (!isInputCurrentlyFocused && isInputFocused) {
+            setIsInputFocused(false);
+          }
+          
+          // Reset returned from response state
+          if (isReturnedFromResponse) {
+            setIsReturnedFromResponse(false);
+          }
+        }
+      }, 50);
+    };
+
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
+  }, [isReturnedFromResponse, isInputFocused, questionMode]);
+
+  // Close other dialogs when one is opened
+  useEffect(() => {
+    if (showPdfDialog || showHelpScreen || showTechnicalInfo || showBusinessGuide) {
+      setShowChatHistory(false);
+      setUserHasInteracted(true);
+    }
+  }, [showPdfDialog, showHelpScreen, showTechnicalInfo, showBusinessGuide]);
+
+  // PDF loading timeout
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (showPdfDialog && pdfLoading) {
+      // Pre-test the PDF URL before loading in iframe
+      const testPdfUrl = async () => {
+        if (!backendUrl) return;
+        
+        try {
+          const response = await fetch(`${backendUrl}/pdf/reliance/reliance_faq.pdf`, {
+            method: 'HEAD',
+            mode: 'cors'
+          });
+          
+          if (!response.ok) {
+            throw new Error(`PDF not accessible: ${response.status} ${response.statusText}`);
+          }
+          
+          // Check if browser supports PDF viewing
+          const userAgent = navigator.userAgent.toLowerCase();
+          const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+          const isIOSSafari = /ipad|iphone|ipod/.test(userAgent) && /safari/i.test(userAgent);
+          
+          if (isMobile || isIOSSafari) {
+            // Mobile browsers often don't support PDF iframes well
+            setPdfLoading(false);
+            setPdfError("PDF viewing in mobile browsers may not work properly. Please use the 'Open in New Tab' button below for the best experience.");
+            return;
+          }
+          
+          // If pre-test passes, continue with iframe loading
+          timeoutId = setTimeout(() => {
+            if (pdfLoading) {
+              setPdfLoading(false);
+              setPdfError("Document loading timed out. The PDF file might be large or there could be network issues. Please try clicking 'Open in New Tab' below.");
+              console.error('PDF loading timeout after 30 seconds. Backend URL:', backendUrl);
+            }
+          }, 30000); // Increased to 30 seconds
+          
+        } catch (error) {
+          setPdfLoading(false);
+          setPdfError(`Failed to access PDF: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your network connection.`);
+          console.error('PDF pre-test failed:', error);
+        }
+      };
+      
+      testPdfUrl();
+    }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [showPdfDialog, pdfLoading, setPdfLoading, setPdfError, backendUrl]);
+
+  // Mark user interaction when input is focused
+  useEffect(() => {
+    if (isInputFocused) {
+      setUserHasInteracted(true);
+    }
+  }, [isInputFocused]);
+
+  // Handle typing animation completion
+  const handleTypingAnimationComplete = () => {
+    setShowTypingAnimation(false);
+    // Immediately show main content when typing is complete
+    setShowMainContent(true);
   };
 
-  /**
-   * Submit question to backend and set response data
-   */
+  // Handle user interaction during typing animation
+  const handleUserInteractionDuringTyping = () => {
+    setUserHasInteracted(true);
+    setShowTypingAnimation(false);
+    // Immediately show main content when user interacts
+    setShowMainContent(true);
+  };
+
+  // Auto-show main content when system is ready and no typing animation
+  useEffect(() => {
+    if (isSystemReady && !showTypingAnimation && !showMainContent) {
+      setShowMainContent(true);
+    }
+  }, [isSystemReady, showTypingAnimation, showMainContent]);
+
+  // Submit question handler
   const handleQuestionSubmit = async (question: string) => {
-    await handleSubmitQuestion(question, backendUrl);
+    setLoading(true);
+    setShowResponse(true);
+    setQuestionMode(false);
     
-    if (!error && responseData && responseData.answer) {
-      setShowResponse(true);
-      setQuestionMode(false);
-      handleAddMessage(question, true);
-      handleAddMessage(responseData.answer, false);
-    } else {
-      const errorMessage = error || 'Sorry, I encountered an error while processing your question. Please try again.';
+    try {
+      const data = await handleSubmitQuestion(question, backendUrl);
+      
+      if (!error && data && data.answer) {
+        handleAddMessage(question, true);
+        handleAddMessage(data.answer, false);
+      } else {
+        const errorMessage = error || 'Sorry, I encountered an error while processing your question. Please try again.';
+        handleAddMessage(errorMessage, false);
+        setShowResponse(false);
+        setQuestionMode(true);
+      }
+    } catch (err) {
+      console.error('Error submitting question:', err);
+      const errorMessage = 'Sorry, I encountered an error while processing your question. Please try again.';
       handleAddMessage(errorMessage, false);
+      setShowResponse(false);
+      setQuestionMode(true);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Only show loader if both conditions are met: initializing AND shouldShowLoader
-  const showLoader = isInitializing && shouldShowLoader;
+  // Show typing animation on initial load
+  if (showTypingAnimation) {
+    return (
+      <Suspense fallback={<ComponentLoader />}>
+        <PageLoadTypingAnimation 
+          messages={typingMessages}
+          onAnimationComplete={handleTypingAnimationComplete}
+          onUserInteraction={handleUserInteractionDuringTyping}
+          autoHideAfter={5000}
+          typingSpeed={35}
+          pauseBetweenMessages={800}
+        />
+      </Suspense>
+    );
+  }
 
+  // Main application content - Always render this as fallback to prevent blank states
   return (
     <TooltipProvider>
-      <MultiStepLoader 
-        loadingStates={initializationSteps} 
-        loading={showLoader} 
-        duration={1000}
-        loop={false}
-      />
       <div className="relative min-h-screen flex flex-col">
         {/* Fixed Background */}
         <div className="fixed inset-0 z-0">
           <BackgroundGradientAnimation
-            gradientBackgroundStart={isDark ? "rgb(13, 13, 13)" : "rgb(240, 245, 250)"}
-            gradientBackgroundEnd={isDark ? "rgb(30, 41, 59)" : "rgb(230, 240, 250)"}
-            firstColor={isDark ? "59, 130, 246" : "59, 130, 246"}
-            secondColor={isDark ? "147, 51, 234" : "147, 51, 234"}
-            thirdColor={isDark ? "236, 72, 153" : "236, 72, 153"}
-            fourthColor={isDark ? "248, 113, 113" : "248, 113, 113"}
-            fifthColor={isDark ? "34, 197, 94" : "34, 197, 94"}
-            pointerColor={isDark ? "99, 102, 241" : "99, 102, 241"}
+            gradientBackgroundStart="rgb(255, 255, 255)"
+            gradientBackgroundEnd="rgb(245, 248, 250)"
+            firstColor="59, 130, 246"
+            secondColor="147, 51, 234"
+            thirdColor="236, 72, 153"
+            fourthColor="34, 197, 94"
+            fifthColor="251, 191, 36"
+            pointerColor="99, 102, 241"
+            size="80%"
+            blendingValue="normal"
             interactive={true}
+            containerClassName="w-full h-full"
           />
         </div>
 
-        {/* Top Navigation Bar */}
-        {/* Theme toggle button removed - light theme only
-        <div className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center p-4">
-          <div className="mr-auto">
-            <div className="flex items-center justify-center h-14 w-14 rounded-full backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg">
-              <ThemeToggle onClick={handleThemeChange} />
+        {/* Show content only when ready */}
+        {showMainContent && (
+          <>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col items-center p-4 pb-8 relative z-10 pointer-events-none min-h-screen">
+              <div className="flex flex-col items-center w-full max-w-4xl pt-32 space-y-8">
+                <PageTitle isVisible={!isInputFocused && questionMode && !isReturnedFromResponse} />
+                <div className="w-full container-reading pointer-events-auto">
+                  <AnimatePresence mode="wait">
+                    {questionMode ? (
+                      <motion.div
+                        key="question"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <div data-chat-container>
+                          <ChatInputSection
+                            isInputFocused={isInputFocused}
+                            setIsInputFocused={setIsInputFocused}
+                            setShowResponse={setShowResponse}
+                            onAddMessage={handleAddMessage}
+                            questionMode={questionMode}
+                            setQuestionMode={setQuestionMode}
+                            currentQuestion={currentQuestion}
+                            autoFocus={shouldAutoFocus}
+                            onSubmitQuestion={handleQuestionSubmit}
+                            isReturnedFromResponse={isReturnedFromResponse}
+                            isTransitioning={isTransitioning}
+                          />
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="response"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <QuestionResponseSection
+                          question={currentQuestion}
+                          isVisible={showResponse}
+                          onNewQuestion={() => handleNewQuestion(() => setResponseData(null))}
+                          loading={loading}
+                          responseData={responseData}
+                          backendUrl={backendUrl}
+                          onForceNoCache={() => handleForceNoCache(backendUrl)}
+                          hasUserInteracted={userHasInteracted}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        */}
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 pb-8 relative z-10 pointer-events-none">
-          <PageTitle isVisible={!isInputFocused && questionMode && !isReturnedFromResponse} />
-          <div className="w-full container-reading mx-auto space-y-4 pointer-events-auto">
-            <AnimatePresence mode="wait">
-              {questionMode ? (
-                <motion.div
-                  key="question"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ 
-                    duration: 0.4, 
-                    ease: [0.25, 0.46, 0.45, 0.94]
-                  }}
-                >
-                  <div data-chat-container>
-                    <ChatInputSection
-                      isInputFocused={isInputFocused}
-                      setIsInputFocused={setIsInputFocused}
-                      setShowResponse={setShowResponse}
-                      onAddMessage={handleAddMessage}
-                      questionMode={questionMode}
-                      setQuestionMode={setQuestionMode}
-                      currentQuestion={currentQuestion}
-                      autoFocus={shouldAutoFocus}
-                      onSubmitQuestion={handleQuestionSubmit}
-                      isReturnedFromResponse={isReturnedFromResponse}
-                      isTransitioning={isTransitioning}
-                    />
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="response"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ 
-                    duration: 0.4, 
-                    ease: [0.25, 0.46, 0.45, 0.94]
-                  }}
-                >
-                  <QuestionResponseSection
-                    question={currentQuestion}
-                    isVisible={showResponse}
-                    onNewQuestion={() => handleNewQuestion(() => setResponseData(null))}
-                    loading={loading}
-                    responseData={responseData}
-                    backendUrl={backendUrl}
+            {/* Bottom Navigation */}
+            <AnimatePresence>
+              {!isInputFocused && questionMode && !isReturnedFromResponse && (
+              <motion.div 
+                key="bottom-navigation"
+                className="fixed bottom-24 left-0 right-0 z-20 flex items-center justify-center"
+                initial={{ y: 20, opacity: 0, scale: 0.9 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: 20, opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+              >
+                <div className="flex justify-center items-center w-full max-w-screen-lg px-4">
+                  <FloatingDock
+                    items={[
+                      {
+                        title: "Source Document",
+                        icon: (
+                          <HugeiconsIcon 
+                            icon={File01Icon}
+                            size={32}
+                            color="currentColor"
+                            strokeWidth={1.5}
+                            className="text-gray-600"
+                          />
+                        ),
+                        onClick: () => { 
+                          setShowPdfDialog(true); 
+                          setUserHasInteracted(true); 
+                        }
+                      },
+                      {
+                        title: "Technical Guide",
+                        icon: (
+                          <HugeiconsIcon 
+                            icon={CommandIcon}
+                            size={32}
+                            color="currentColor"
+                            strokeWidth={1.5}
+                            className="text-gray-600"
+                          />
+                        ),
+                        onClick: () => {
+                          setShowTechnicalInfo(true); 
+                          setUserHasInteracted(true);
+                        }
+                      },
+                      {
+                        title: "User Guide",
+                        icon: (
+                          <HugeiconsIcon 
+                            icon={IdeaIcon}
+                            size={32}
+                            color="currentColor"
+                            strokeWidth={1.5}
+                            className="text-gray-600"
+                          />
+                        ),
+                        onClick: () => {
+                          setShowBusinessGuide(true); 
+                          setUserHasInteracted(true);
+                        }
+                      },
+                      {
+                        title: "Chat History",
+                        icon: (
+                          <HugeiconsIcon 
+                            icon={ClockIcon}
+                            size={32}
+                            color="currentColor"
+                            strokeWidth={1.5}
+                            className="text-gray-600"
+                          />
+                        ),
+                        onClick: () => {
+                          setShowChatHistory(!showChatHistory); 
+                          setUserHasInteracted(true);
+                        }
+                      }
+                    ]}
+                    desktopClassName="bg-white shadow-2xl border border-gray-200/50 shadow-black/20 transform-gpu backdrop-blur-xl mx-auto"
+                    mobileClassName="mx-auto"
                   />
-                </motion.div>
+                </div>
+              </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        </div>
 
-        {/* Apple-inspired Bottom Navigation */}
-        <AnimatePresence>
-          {!isInputFocused && questionMode && !isReturnedFromResponse && (
-          <motion.div 
-            key="bottom-navigation"
-            className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-20"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="flex items-center gap-3 px-8 py-2 rounded-full glass-morphism shadow-lg hover-lift">
-              {/* PDF Viewer Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="View PDF"
-                    onClick={() => {
-                      setShowPdfDialog(true);
-                      setPdfError("");
-                    }}
-                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
-                  >
-                    <motion.div
-                      whileHover={{ 
-                        scale: [1, 1.3, 1.1, 1.3, 1], 
-                        rotate: [0, -10, 10, -10, 0],
-                        transition: { 
-                          duration: 0.6, 
-                          ease: "easeInOut",
-                          times: [0, 0.2, 0.4, 0.6, 1]
-                        }
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      animate={{ 
-                        scale: [1, 1.05, 1],
-                        rotate: [0, 2, -2, 0]
-                      }}
-                      transition={{ 
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        repeatDelay: 2
-                      }}
-                    >
-                      <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    </motion.div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-apple-footnote">
-                  <p>View Documents</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Separator */}
-              <div className="w-px h-5 bg-white/20 dark:bg-white/10 mx-1" />
-
-              {/* Technical Info Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="Technical Deep Dive"
-                    onClick={() => setShowTechnicalInfo(true)}
-                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
-                  >
-                    <motion.div
-                      whileHover={{ 
-                        scale: [1, 1.3, 1.1, 1.3, 1], 
-                        rotate: [0, -10, 10, -10, 0],
-                        transition: { 
-                          duration: 0.6, 
-                          ease: "easeInOut",
-                          times: [0, 0.2, 0.4, 0.6, 1]
-                        }
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      animate={{ 
-                        scale: [1, 1.05, 1],
-                        rotate: [0, 3, -3, 0]
-                      }}
-                      transition={{ 
-                        duration: 3.5,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        repeatDelay: 2.5
-                      }}
-                    >
-                      <Terminal className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                    </motion.div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-apple-footnote">
-                  <p>Technical Guide</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* User Guide Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="User Guide"
-                    onClick={() => setShowBusinessGuide(true)}
-                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
-                  >
-                    <motion.div
-                      whileHover={{ 
-                        scale: [1, 1.3, 1.1, 1.3, 1], 
-                        rotate: [0, -10, 10, -10, 0],
-                        transition: { 
-                          duration: 0.6, 
-                          ease: "easeInOut",
-                          times: [0, 0.2, 0.4, 0.6, 1]
-                        }
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      animate={{ 
-                        scale: [1, 1.05, 1],
-                        rotate: [0, -2, 2, 0]
-                      }}
-                      transition={{ 
-                        duration: 4,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        repeatDelay: 3
-                      }}
-                    >
-                      <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    </motion.div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-apple-footnote">
-                  <p>User Guide</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Separator */}
-              <div className="w-px h-5 bg-white/20 dark:bg-white/10 mx-1" />
-
-              {/* Chat History Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="Chat History"
-                    onClick={() => setShowChatHistory(!showChatHistory)}
-                    className="relative h-9 w-9 rounded-full transition-all duration-300 hover:bg-white/20 dark:hover:bg-white/10 group bg-transparent border-0"
-                  >
-                    <motion.div
-                      whileHover={{ 
-                        scale: [1, 1.3, 1.1, 1.3, 1], 
-                        rotate: [0, -10, 10, -10, 0],
-                        transition: { 
-                          duration: 0.6, 
-                          ease: "easeInOut",
-                          times: [0, 0.2, 0.4, 0.6, 1]
-                        }
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      animate={{ 
-                        scale: [1, 1.05, 1],
-                        rotate: [0, 1, -1, 0]
-                      }}
-                      transition={{ 
-                        duration: 4.5,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        repeatDelay: 3.5
-                      }}
-                    >
-                      <History className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                    </motion.div>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-apple-footnote">
-                  <p>Chat History</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Apple-inspired Footer */}
-        <AnimatePresence>
-          {!isInputFocused && questionMode && !isReturnedFromResponse && (
-          <motion.footer 
-            key="footer"
-            className="fixed bottom-0 left-0 right-0 z-10"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className={`w-full py-3 px-6 text-center backdrop-blur-md border-t ${
-              isDark 
-                ? 'bg-black/20 border-white/10' 
-                : 'bg-white/40 border-white/30'
-            }`}>
-              <p className="flex items-center justify-center gap-2 text-apple-footnote">
-                <span className="text-slate-500 dark:text-slate-400">Powered by</span>
-                <span className={`font-semibold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-                  Increff AQu AI Service
-                </span>
-                <span className="text-slate-400 dark:text-slate-500">•</span>
-                <span className="text-apple-caption text-slate-400 dark:text-slate-500">
-                  © 2025 Increff Technologies
-                </span>
-              </p>
-            </div>
-          </motion.footer>
-          )}
-        </AnimatePresence>
-
-        {/* Help Screen */}
-        {showHelpScreen && (
-          <HelpScreen 
-            isOpen={showHelpScreen} 
-            onClose={() => setShowHelpScreen(false)} 
-          />
-        )}
-
-        {/* Technical Deep Dive Section */}
-        {showTechnicalInfo && (
-          <TechnicalInfoSection 
-            isOpen={showTechnicalInfo} 
-            onClose={() => setShowTechnicalInfo(false)} 
-          />
-        )}
-
-        {/* User Guide Section */}
-        {showBusinessGuide && (
-          <BusinessGuideSection 
-            isOpen={showBusinessGuide} 
-            onClose={() => setShowBusinessGuide(false)} 
-          />
-        )}
-
-        {/* PDF Viewer Dialog */}
-        {showPdfDialog && (
-          <Dialog open={showPdfDialog} onOpenChange={setShowPdfDialog}>
-            <DialogContent className="max-w-4xl w-[88vw] max-h-[88vh] p-0 gap-0 transition-all duration-300 rounded-3xl overflow-hidden">
-              {/* Apple-inspired Header */}
-              <div className="relative flex items-center py-4 px-6 border-b glass-morphism shadow-sm">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900">
-                    <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <DialogTitle className="text-apple-headline font-bold text-gray-900 dark:text-gray-100">
-                      Document Viewer
-                    </DialogTitle>
-                    <p className="text-apple-footnote text-gray-600 dark:text-gray-400">
-                      AQu Knowledge Base
-                    </p>
-                  </div>
+            {/* Footer */}
+            <AnimatePresence>
+              {!isInputFocused && questionMode && !isReturnedFromResponse && (
+              <motion.footer 
+                key="footer"
+                className="fixed bottom-0 left-0 right-0 z-5"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 20, opacity: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <div className={`w-full py-2 px-6 text-center backdrop-blur-sm ${isDark ? 'bg-black/5 border-white/5' : 'bg-white/10 border-white/20'} border-t`}>
+                  <p className="flex items-center justify-center gap-2 text-xs">
+                    <span className="text-slate-500/70 dark:text-slate-400/70">Powered by</span>
+                    <span className={`font-medium ${isDark ? 'text-blue-400/80' : 'text-blue-600/80'}`}>Increff AQu AI Service</span>
+                    <span className="text-slate-400/50 dark:text-slate-500/50">•</span>
+                    <span className="text-xs text-slate-400/70 dark:text-slate-500/70">© 2025 Increff Technologies</span>
+                  </p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        aria-label="Reset PDF View"
-                        onClick={() => {
-                          const iframe = document.querySelector('iframe');
-                          if (iframe) {
-                            iframe.src = `${backendUrl}/pdf/reliance/reliance_faq.pdf`;
-                          }
-                        }}
-                        className="p-1 transition-all duration-200 hover:scale-110 focus:outline-none"
-                      >
-                        <RotateCcw className="h-5 w-5 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-apple-footnote">Reset View</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        aria-label="Open in Tab"
-                        onClick={() => {
-                          window.open(`${backendUrl}/pdf/reliance/reliance_faq.pdf`, '_blank');
-                        }}
-                        className="p-1 transition-all duration-200 hover:scale-110 focus:outline-none"
-                      >
-                        <ExternalLink className="h-5 w-5 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors duration-200" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-apple-footnote">Open in Tab</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DialogClose asChild>
-                        <button 
-                          aria-label="Close PDF Viewer" 
-                          className="p-1 transition-all duration-200 hover:scale-110 focus:outline-none"
-                        >
-                          <X className="h-5 w-5 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200" />
-                        </button>
-                      </DialogClose>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-apple-footnote">Close</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
+              </motion.footer>
+              )}
+            </AnimatePresence>
 
-              {/* PDF Content */}
-              <div className="h-[75vh] overflow-hidden bg-gray-50 dark:bg-gray-900">
-                {pdfLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <motion.div 
-                      className="flex flex-col items-center gap-4"
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Loader2 className="h-8 w-8 text-blue-500 dark:text-blue-400" />
-                      </motion.div>
-                      <p className="text-apple-body text-gray-600 dark:text-gray-400 font-medium">
-                        Loading Document...
-                      </p>
-                    </motion.div>
-                  </div>
-                ) : pdfError ? (
-                  <div className="flex items-center justify-center h-full">
-                    <motion.div 
-                      className="text-center p-8 max-w-md"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="p-4 rounded-full bg-red-100 dark:bg-red-900 w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                        <X className="h-8 w-8 text-red-600 dark:text-red-400" />
-                      </div>
-                      <p className="text-apple-body text-red-600 dark:text-red-400 mb-4 font-medium">
-                        {pdfError}
-                      </p>
-                      <Button 
-                        onClick={() => setShowPdfDialog(false)}
-                        className="rounded-full px-6 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-700 dark:text-red-300 border-0 transition-all duration-200"
-                      >
-                        Close
-                      </Button>
-                    </motion.div>
-                  </div>
-                ) : (
-                  <motion.iframe
-                    src={`${backendUrl}/pdf/reliance/reliance_faq.pdf`}
-                    className="w-full h-full border-0 bg-white dark:bg-gray-800"
-                    title="PDF Document"
-                    onLoad={handlePdfLoad}
-                    onError={handlePdfError}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
+            {/* Dialogs and Screens */}
+            {showHelpScreen && (
+              <Suspense fallback={<ComponentLoader />}>
+                <HelpScreen isOpen={showHelpScreen} onClose={() => setShowHelpScreen(false)} />
+              </Suspense>
+            )} 
+            {showTechnicalInfo && (
+              <Suspense fallback={<ComponentLoader />}>
+                <TechnicalInfoSection isOpen={showTechnicalInfo} onClose={() => setShowTechnicalInfo(false)} />
+              </Suspense>
+            )} 
+            {showBusinessGuide && (
+              <Suspense fallback={<ComponentLoader />}>
+                <BusinessGuideSection isOpen={showBusinessGuide} onClose={() => setShowBusinessGuide(false)} />
+              </Suspense>
+            )} 
 
-        {/* Error Toast */}
-        {error && (
-          <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
-            <div className={`px-4 py-2 rounded-lg shadow-lg ${
-              isDark ? 'bg-red-900/90 text-red-100' : 'bg-red-100/90 text-red-900'
-            }`}>
-              <p className="text-sm font-medium">{error}</p>
-            </div>
-          </div>
-        )}
+            {/* PDF Viewer Dialog */}
+            {showPdfDialog && (
+              <Dialog open={showPdfDialog} onOpenChange={setShowPdfDialog}>
+                <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] p-0 gap-0 transition-all duration-300 rounded-3xl overflow-hidden">
+                  {/* Hidden title for accessibility */}
+                  <DialogTitle className="sr-only">
+                    Reliance FAQ Document Viewer
+                  </DialogTitle>
+                  {/* Hidden description for accessibility */}
+                  <DialogDescription className="sr-only">
+                    Interactive PDF viewer displaying the Reliance Frequently Asked Questions document. Use the toolbar controls to navigate, zoom, and interact with the document.
+                  </DialogDescription>
+                  <Suspense fallback={<ComponentLoader />}>
+                    <SimplePdfViewer
+                      pdfUrl={backendUrl ? `${backendUrl}/pdf/reliance/reliance_faq.pdf` : ''}
+                      onClose={() => setShowPdfDialog(false)}
+                      className="h-[95vh]"
+                    />
+                  </Suspense>
+                </DialogContent>
+              </Dialog>
+            )}
 
-        {/* Chat History */}
-        {showChatHistory && (
-          <ChatHistory
-            messages={chatHistory}
-            onClear={clearHistory}
-            onClose={() => setShowChatHistory(false)}
-          />
+            {/* Chat History */}
+            <AnimatePresence>
+              {showChatHistory && (
+                <ChatHistory
+                  messages={chatHistory}
+                  onClear={clearHistory}
+                  onClose={() => setShowChatHistory(false)}
+                />
+              )}
+            </AnimatePresence>
+          </>
         )}
       </div>
     </TooltipProvider>

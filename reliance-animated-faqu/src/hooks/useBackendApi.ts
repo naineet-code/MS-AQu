@@ -8,18 +8,21 @@ interface UseBackendApiReturn {
   setResponseData: (data: any) => void;
   error: string | null;
   setError: (error: string | null) => void;
-  handleSubmitQuestion: (question: string, backendUrl: string | null) => Promise<void>;
+  handleSubmitQuestion: (question: string, backendUrl: string | null, forceNoCache?: boolean) => Promise<any>;
+  handleForceNoCache: (backendUrl: string | null) => Promise<void>;
 }
 
 export const useBackendApi = (): UseBackendApiReturn => {
   const [loading, setLoading] = useState(false);
   const [responseData, setResponseData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<string>('');
 
-  const makeApiRequest = async (question: string, backendUrl: string) => {
+  const makeApiRequest = async (question: string, backendUrl: string, forceNoCache: boolean = false) => {
     const requestBody = {
       query: question,
-      category: 'reliance'
+      category: 'reliance',
+      force_no_cache: forceNoCache
     };
     console.log('📤 Sending request to:', backendUrl, requestBody);
 
@@ -43,21 +46,22 @@ export const useBackendApi = (): UseBackendApiReturn => {
     return data;
   };
 
-  const handleSubmitQuestion = async (question: string, backendUrl: string | null) => {
-    console.log('🚀 handleSubmitQuestion called with:', { question, backendUrl });
+  const handleSubmitQuestion = async (question: string, backendUrl: string | null, forceNoCache: boolean = false) => {
+    console.log('🚀 handleSubmitQuestion called with:', { question, backendUrl, forceNoCache });
     
     if (!backendUrl) {
       console.error('❌ Backend URL not loaded');
       setError('Backend URL not loaded');
-      return;
+      return null;
     }
 
     setLoading(true);
     setError(null);
+    setCurrentQuestion(question);
     
     try {
       // First attempt with current backend URL
-      const data = await makeApiRequest(question, backendUrl);
+      const data = await makeApiRequest(question, backendUrl, forceNoCache);
       console.log('✅ Raw backend response:', JSON.stringify(data, null, 2));
       console.log('✅ Backend response keys:', Object.keys(data));
       console.log('✅ Has answer?', !!data.answer);
@@ -66,9 +70,12 @@ export const useBackendApi = (): UseBackendApiReturn => {
       console.log('✅ Has models?', !!data.models);
       console.log('✅ Has citations?', !!data.citations);
       console.log('✅ Has costs?', !!data.costs);
+      console.log('✅ Cache hit?', data.cache_hit);
+      console.log('✅ Force no cache?', data.forced_no_cache);
       console.log('✅ Setting response data:', data);
       setResponseData(data);
-    } catch (firstError) {
+      return data; // Return the data so it can be used immediately
+    } catch (firstError: any) {
       console.warn('❌ First attempt failed:', firstError);
       
       try {
@@ -78,10 +85,11 @@ export const useBackendApi = (): UseBackendApiReturn => {
         
         if (newBackendUrl !== backendUrl) {
           console.log('🔄 Trying with new backend URL:', newBackendUrl);
-          const data = await makeApiRequest(question, newBackendUrl);
+          const data = await makeApiRequest(question, newBackendUrl, forceNoCache);
           console.log('✅ Raw backend response (retry):', JSON.stringify(data, null, 2));
           console.log('✅ Setting response data from retry:', data);
           setResponseData(data);
+          return data; // Return the data so it can be used immediately
         } else {
           throw firstError; // Same URL, don't retry
         }
@@ -89,10 +97,18 @@ export const useBackendApi = (): UseBackendApiReturn => {
         console.error('❌ Both attempts failed:', { firstError, secondError });
         const errorMessage = secondError instanceof Error ? secondError.message : 'An unexpected error occurred';
         setError(`Failed to connect to backend. Please check your connection and try again.`);
+        return null;
       }
     } finally {
       setLoading(false);
       console.log('🏁 handleSubmitQuestion finished');
+    }
+  };
+
+  const handleForceNoCache = async (backendUrl: string | null) => {
+    if (currentQuestion && backendUrl) {
+      console.log('🔄 Force no cache for question:', currentQuestion);
+      await handleSubmitQuestion(currentQuestion, backendUrl, true);
     }
   };
 
@@ -103,6 +119,7 @@ export const useBackendApi = (): UseBackendApiReturn => {
     setResponseData,
     error,
     setError,
-    handleSubmitQuestion
+    handleSubmitQuestion,
+    handleForceNoCache
   };
 }; 

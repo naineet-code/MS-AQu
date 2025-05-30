@@ -13,3 +13,4 @@ toml
 psutil
 httpx
 aiohttp
+redis==5.0.1

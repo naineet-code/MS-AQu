@@ -64,9 +64,9 @@ curl -X POST "http://localhost:8000/api/query?query=What%20is%20WSSI&category=re
 - **deployment_name**: Your model deployment name in Azure
 
 ### Model Usage
-- **Mini Model**: Used for routing and chunk selection (cost-effective)
-- **Main Model**: Used for generating detailed answers (high quality)
-- **Nano Model**: Used for verification and validation (fast responses)
+- **Mini Model**: GPT-4.1 Mini - Used for routing and reasoning (cost-effective)
+- **Main Model**: GPT-4.1 (Flagship) - Used for generating detailed answers (high quality)
+- **Nano Model**: GPT-4.1 Nano - Used for verification and validation (fast responses)
 
 ## 🎯 Benefits of the New System
 
@@ -80,15 +80,20 @@ The backend now provides all fields the frontend expects:
   "relevant_paragraphs": [{"text": "full text", "page": [1,2]}],
   "costs": [
     {
-      "model": "GPT-4.1-mini (Routing)",
+      "model": "GPT-4.1 Mini",
+      "operation": "reasoning",
       "input_tokens": 1500,
       "output_tokens": 200,
-      "input_cost": 0.015,
-      "output_cost": 0.006,
-      "total_cost": 0.021
+      "input_cost": 0.000225,
+      "output_cost": 0.00012,
+      "total_cost": 0.000345
     }
   ],
-  "model": "GPT-4.1-mini",
+  "models": {
+    "reasoning": "GPT-4.1 Mini",
+    "answer": "GPT-4.1",
+    "verification": "GPT-4.1 Nano"
+  },
   "usage": {"total_tokens": 1700, "prompt_tokens": 1500, "completion_tokens": 200},
   "success": true,
   "timestamp": 1703123456.789
@@ -107,10 +112,27 @@ The backend now provides all fields the frontend expects:
 
 ## 💸 Cost Calculation & Transparency
 
-- The backend calculates the true cost for every AI model used in a response (e.g., mini, main, nano) using the latest rates from config/config.json.
-- The API response includes a costs array, with a breakdown for each model (model name, input/output/total tokens, and costs).
-- The frontend aggregates and displays the total cost incurred for the response, as well as a detailed breakdown per model.
-- Model pricing is always fetched from the backend and is kept up-to-date for full transparency.
+- The backend calculates the true cost for every AI model used in a response using GPT-4.1 family pricing
+- All models (mini, main, nano) are tracked with detailed pricing from config/config.json
+- The API response includes a costs array with breakdown for each model operation
+- Cache operations (verification) are included in cost calculations
+- The frontend displays total cost and detailed breakdown per model operation
+- Model pricing is kept up-to-date for full transparency
+
+### Current GPT-4.1 Pricing (Azure OpenAI):
+
+**GPT-4.1 Mini**
+- Global Deployment:
+  - Input: $0.00015 / 1,000 tokens
+  - Output: $0.0006 / 1,000 tokens
+- Regional Deployment:
+  - Input: $0.000165 / 1,000 tokens
+  - Output: $0.00066 / 1,000 tokens
+
+**GPT-4.1 Features:**
+- 💸 Cost-Efficient: Lower price point than previous models
+- ⚡ High Performance: 82% on MMLU benchmark (vs GPT-3.5 Turbo at 70%)
+- 🌍 Flexible Deployment: Supports both global and regional use cases
 
 ## 🔍 Troubleshooting
 
@@ -148,19 +170,19 @@ The system automatically validates credentials on startup:
 api_key = "sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
 endpoint = "https://my-openai-east.openai.azure.com/"
 api_version = "2024-02-15-preview"
-deployment_name = "gpt-4-mini-deployment"
+deployment_name = "gpt-4.1-mini-deployment"
 
 [azure_openai.main]
 api_key = "sk-xyz987wvu654tsr321qpo098nml765kji432hgf210edc098ba"
 endpoint = "https://my-openai-west.openai.azure.com/"
 api_version = "2024-02-15-preview"
-deployment_name = "gpt-4-deployment"
+deployment_name = "gpt-4.1-deployment"
 
 [azure_openai.nano]
 api_key = "sk-mno345pqr678stu901vwx234yz567abc123def456ghi789jkl"
 endpoint = "https://my-openai-central.openai.azure.com/"
 api_version = "2024-02-15-preview"
-deployment_name = "gpt-4-nano-deployment"
+deployment_name = "gpt-4.1-nano-deployment"
 ```
 
 ## 🎉 Success Indicators

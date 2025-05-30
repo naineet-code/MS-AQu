@@ -1,8 +1,8 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Dialog, DialogContent, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { MessageSquare, Search, FileText, BarChart3, Lightbulb, Zap, X, HelpCircle, Brain, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
@@ -18,36 +18,40 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
 
   const navigationButtons = [
     {
+      title: "View FAQs",
+      description: "Browse frequently asked questions with instant answers",
       icon: <FileText className="w-5 h-5" />,
-      title: "📄 PDF Viewer",
-      color: "blue",
-      description: "View the original documents and knowledge base",
-      location: "Bottom left corner (blue button)",
-      usage: "Click to open the complete PDF documents for detailed reading"
+      shortcut: "Ctrl+F",
+      color: "text-sky-600 dark:text-sky-400",
+      bgColor: "bg-sky-50 dark:bg-sky-900/20",
+      borderColor: "border-sky-200 dark:border-sky-800"
     },
     {
+      title: "AI Models",
+      description: "Learn about our GPT-4o models and capabilities",
       icon: <Brain className="w-5 h-5" />,
-      title: "🧠 AI Engine Info",
-      color: "purple", 
-      description: "Learn about the AI system powering your answers",
-      location: "Bottom left corner (purple button)",
-      usage: "Click to see technical details about the AI model and capabilities"
+      shortcut: "Ctrl+M",
+      color: "text-violet-600 dark:text-violet-400",
+      bgColor: "bg-violet-50 dark:bg-violet-900/20",
+      borderColor: "border-violet-200 dark:border-violet-800"
     },
     {
+      title: "Get Help",
+      description: "Access this help guide anytime",
       icon: <HelpCircle className="w-5 h-5" />,
-      title: "❓ Help Guide",
-      color: "emerald",
-      description: "This help screen you're viewing now",
-      location: "Bottom left corner (green button)",
-      usage: "Click anytime you need guidance on using the application"
+      shortcut: "Ctrl+H",
+      color: "text-emerald-600 dark:text-emerald-400",
+      bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+      borderColor: "border-emerald-200 dark:border-emerald-800"
     },
     {
+      title: "History",
+      description: "Review your previous questions and answers",
       icon: <History className="w-5 h-5" />,
-      title: "📜 Chat History",
-      color: "blue",
-      description: "View and manage your previous conversations",
-      location: "Bottom right corner (standalone button)",
-      usage: "Click to see all your past questions and answers. Click again or use the X to close."
+      shortcut: "Ctrl+Y",
+      color: "text-amber-600 dark:text-amber-400",
+      bgColor: "bg-amber-50 dark:bg-amber-900/20",
+      borderColor: "border-amber-200 dark:border-amber-800"
     }
   ];
 
@@ -86,9 +90,12 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
 
   const features = [
     {
+      step: 1,
+      title: "Ask a Question",
+      description: "Type your question in the input field",
       icon: <MessageSquare className="w-6 h-6" />,
-      title: "💬 Smart Chat Interface",
-      description: "Ask questions in natural language and get instant, intelligent answers from our knowledge base.",
+      color: "text-sky-600",
+      bgColor: "bg-sky-50 dark:bg-sky-900/20",
       tips: [
         "Ask specific questions for better results: 'What is WSSI?' vs 'Tell me about planning'",
         "Follow up with 'Can you explain this simpler?' if the answer is too technical",
@@ -96,9 +103,12 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
       ]
     },
     {
+      step: 2,
+      title: "Smart Suggestions",
+      description: "Click on suggested questions or type your own",
       icon: <Search className="w-6 h-6" />,
-      title: "🔍 Intelligent Search",
-      description: "AI-powered search that understands context and finds the most relevant information.",
+      color: "text-violet-600",
+      bgColor: "bg-violet-50 dark:bg-violet-900/20",
       tips: [
         "Search works with abbreviations: 'AOP', 'WSSI', 'GRN'",
         "Ask comparative questions: 'Difference between actual and projected sales'",
@@ -106,9 +116,12 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
       ]
     },
     {
+      step: 3,
+      title: "Instant Answers",
+      description: "Get comprehensive responses from our AI",
       icon: <FileText className="w-6 h-6" />,
-      title: "📋 Detailed Responses",
-      description: "Get comprehensive answers with citations, sources, and related information.",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
       tips: [
         "Check the citations to verify information sources",
         "Click on page references to jump to specific sections",
@@ -116,9 +129,12 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
       ]
     },
     {
+      step: 4,
+      title: "Learn More",
+      description: "Explore FAQs, guides, and technical details",
       icon: <BarChart3 className="w-6 h-6" />,
-      title: "📊 Response Analysis",
-      description: "Understand reasoning, view relevant paragraphs, and explore pricing details.",
+      color: "text-amber-600",
+      bgColor: "bg-amber-50 dark:bg-amber-900/20",
       tips: [
         "Expand sections to see the AI's reasoning process",
         "Review relevant paragraphs for deeper context",
@@ -167,10 +183,14 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl w-[95vw] h-[95vh] p-0 gap-0">
         {/* Header */}
-        <div className="relative flex items-center p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="relative flex items-center p-4 border-b bg-gradient-to-r from-sky-50 to-violet-50 dark:from-gray-900 dark:to-gray-800">
           <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-200 flex-1 pr-20">
             🚀 How to Use Your FAQ Assistant - Complete Guide
           </DialogTitle>
+          {/* Hidden description for accessibility */}
+          <DialogDescription className="sr-only">
+            Comprehensive help guide showing how to use the FAQ assistant effectively. Includes quick start steps, control buttons guide, example questions, and pro tips.
+          </DialogDescription>
           <DialogClose asChild>
             <Button size="icon" variant="ghost" aria-label="Close Help" className="h-8 w-8 ml-2">
               <X className="h-4 w-4" />
@@ -188,7 +208,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
             transition={{ delay: 0.1 }}
           >
             <h3 className={`text-2xl font-bold mb-6 flex items-center gap-3 ${
-              isDark ? 'text-blue-300' : 'text-blue-700'
+              isDark ? 'text-sky-300' : 'text-sky-700'
             }`}>
               <Zap className="w-6 h-6" />
               🚀 Quick Start in 4 Steps
@@ -206,7 +226,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
                 >
                   <div className="flex items-start gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                      isDark ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'
+                      isDark ? 'bg-sky-900 text-sky-300' : 'bg-sky-100 text-sky-700'
                     }`}>
                       {step.step}
                     </div>
@@ -235,7 +255,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
             transition={{ delay: 0.3 }}
           >
             <h3 className={`text-2xl font-bold mb-6 flex items-center gap-3 ${
-              isDark ? 'text-purple-300' : 'text-purple-700'
+              isDark ? 'text-violet-300' : 'text-violet-700'
             }`}>
               🎮 Control Buttons Guide
             </h3>
@@ -246,17 +266,13 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + index * 0.1 }}
-                  className={`p-4 rounded-lg border ${
-                    isDark ? 'bg-gray-800/30 border-gray-600' : 'bg-gray-50 border-gray-200'
-                  }`}
+                  className={`p-4 rounded-lg border ${button.borderColor} ${button.bgColor}`}
                 >
                   <div className="flex items-start gap-4">
-                    <div className={`p-2 rounded-lg ${
-                      button.color === 'blue' ? 'bg-blue-100 dark:bg-blue-900' :
-                      button.color === 'purple' ? 'bg-purple-100 dark:bg-purple-900' :
-                      'bg-emerald-100 dark:bg-emerald-900'
-                    }`}>
-                      {button.icon}
+                    <div className={`p-2 rounded-lg ${button.bgColor}`}>
+                      <div className={button.color}>
+                        {button.icon}
+                      </div>
                     </div>
                     <div className="flex-1">
                       <h4 className={`font-semibold text-lg mb-2 ${
@@ -269,17 +285,10 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
                       }`}>
                         {button.description}
                       </p>
-                      <div className="space-y-1">
-                        <p className={`text-xs font-medium ${
-                          isDark ? 'text-blue-400' : 'text-blue-600'
-                        }`}>
-                          📍 Location: {button.location}
-                        </p>
-                        <p className={`text-xs ${
-                          isDark ? 'text-gray-400' : 'text-gray-500'
-                        }`}>
-                          💡 Usage: {button.usage}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={"secondary" as any} className="text-xs">
+                          {button.shortcut}
+                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -317,10 +326,10 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
                   </h4>
                   <div className="grid gap-2">
                     {category.questions.map((question, questionIndex) => (
-                      <Badge key={questionIndex} variant="outline" className={`justify-start p-3 text-sm ${
+                      <Badge key={questionIndex} variant={"outline" as any} className={`justify-start p-3 text-sm ${
                         isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-100'
                       }`}>
-                        "💬 {question}"
+                        💬 {question}
                       </Badge>
                     ))}
                   </div>
@@ -336,7 +345,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
             transition={{ delay: 0.7 }}
           >
             <h3 className={`text-2xl font-bold mb-6 ${
-              isDark ? 'text-orange-300' : 'text-orange-700'
+              isDark ? 'text-amber-300' : 'text-amber-700'
             }`}>⭐ Key Features & Tips</h3>
             <div className="grid md:grid-cols-2 gap-6">
               {features.map((feature, index) => (
@@ -345,13 +354,9 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.8 + index * 0.1 }}
-                  className={`p-4 rounded-lg ${
-                    isDark ? 'bg-gray-800/50' : 'bg-gray-50'
-                  }`}
+                  className={`p-4 rounded-lg ${feature.bgColor}`}
                 >
-                  <div className={`flex items-center gap-3 mb-3 ${
-                    isDark ? 'text-orange-400' : 'text-orange-600'
-                  }`}>
+                  <div className={`flex items-center gap-3 mb-3 ${feature.color}`}>
                     {feature.icon}
                     <h4 className={`font-semibold ${
                       isDark ? 'text-gray-100' : 'text-gray-900'
@@ -369,9 +374,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
                       <div key={tipIndex} className={`text-sm flex items-start gap-2 ${
                         isDark ? 'text-gray-400' : 'text-gray-500'
                       }`}>
-                        <span className={`mt-1 ${
-                          isDark ? 'text-orange-400' : 'text-orange-600'
-                        }`}>•</span>
+                        <span className={feature.color}>•</span>
                         {tip}
                       </div>
                     ))}
@@ -388,23 +391,23 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
             transition={{ delay: 0.9 }}
           >
             <h3 className={`text-2xl font-bold mb-6 flex items-center gap-3 ${
-              isDark ? 'text-yellow-300' : 'text-yellow-700'
+              isDark ? 'text-amber-300' : 'text-amber-700'
             }`}>
               <Lightbulb className="w-6 h-6" />
               🏆 Pro Tips for Best Results
             </h3>
             <Card className={`p-6 ${
-              isDark ? 'bg-gray-800/50' : 'bg-gradient-to-r from-yellow-50 to-orange-50'
+              isDark ? 'bg-gray-800/50' : 'bg-gradient-to-r from-amber-50 to-orange-50'
             }`}>
               <CardContent className="p-0">
                 <div className="grid gap-3">
                   {proTips.map((tip, index) => (
                     <div key={index} className="flex items-start gap-3">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                        isDark ? 'bg-yellow-900' : 'bg-yellow-100'
+                        isDark ? 'bg-amber-900' : 'bg-amber-100'
                       }`}>
                         <span className={`text-sm font-medium ${
-                          isDark ? 'text-yellow-300' : 'text-yellow-600'
+                          isDark ? 'text-amber-300' : 'text-amber-600'
                         }`}>{index + 1}</span>
                       </div>
                       <p className={`text-sm ${
@@ -442,4 +445,4 @@ const HelpScreen: React.FC<HelpScreenProps> = ({ isOpen, onClose }) => {
   );
 };
 
-export default HelpScreen;
+export default HelpScreen; 

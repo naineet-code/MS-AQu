@@ -74,7 +74,7 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
                   }`}
                   aria-label="Clear chat history"
                 >
-                  <Trash2 className="h-4 w-4 transition-colors duration-300" />
+                  <Trash2 className="h-5 w-5 transition-colors duration-300" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Clear History</TooltipContent>
@@ -93,7 +93,7 @@ export default function ChatHistory({ messages, onClear, onClose }: ChatHistoryP
                   }`}
                   aria-label="Close chat history"
                 >
-                  <X className="h-4 w-4 transition-colors duration-300" />
+                  <X className="h-5 w-5 transition-colors duration-300" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Close History</TooltipContent>

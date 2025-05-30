@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from config.logging_config import setup_logging, get_logger
 from config.settings import Settings
@@ -27,6 +27,8 @@ from typing import Optional
 import asyncio
 import aiohttp
 import time
+from core.cache_manager import RedisCacheManager
+from email.utils import formatdate
 
 # Initialize logging
 setup_logging()
@@ -82,12 +84,54 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Add PDF serving route
 @app.get("/pdf/{category}/{filename}")
-async def serve_pdf(category: str, filename: str):
-    """Serve PDF files from the static directory."""
+@app.head("/pdf/{category}/{filename}")
+async def serve_pdf(category: str, filename: str, request: Request):
+    """Serve PDF files from the static directory with explicit CORS headers."""
     pdf_path = Path("static/pdfs") / category / filename
     if not pdf_path.exists():
         raise HTTPException(status_code=404, detail="PDF not found")
-    return FileResponse(pdf_path)
+    
+    # For HEAD requests, return headers only
+    if request.method == "HEAD":
+        return Response(
+            status_code=200,
+            headers={
+                "Content-Type": "application/pdf",
+                "Content-Length": str(pdf_path.stat().st_size),
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Cache-Control": "public, max-age=3600",
+                "Last-Modified": formatdate(pdf_path.stat().st_mtime),
+                "ETag": f'"{pdf_path.stat().st_mtime}"'
+            }
+        )
+    
+    # For GET requests, return the file
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Cache-Control": "public, max-age=3600"
+        }
+    )
+
+# Add OPTIONS handler for PDF route to handle preflight requests
+@app.options("/pdf/{category}/{filename}")
+async def options_pdf(category: str, filename: str):
+    """Handle CORS preflight requests for PDF files."""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600"
+        }
+    )
 
 @app.get("/health")
 async def health_check():
@@ -237,6 +281,16 @@ async def status_page():
     """Render the enhanced modern status page."""
     system_info = get_system_info()
     pdfs = list(pdf_manager.pdf_cache.keys())
+    cache_manager = RedisCacheManager()
+    cache_stats = cache_manager.get_cache_stats()
+    redis_status = {
+        "connected": cache_manager.redis_client is not None,
+        "host": settings.get("REDIS_HOST", "localhost"),
+        "port": settings.get("REDIS_PORT", 6379),
+        "db": settings.get("REDIS_DB", 0),
+        "cache_ttl": settings.get("CACHE_TTL", 3600),
+        "similarity_threshold": settings.get("CACHE_SIMILARITY_THRESHOLD", 0.85)
+    }
     
     # Get AI credentials status
     try:
@@ -272,154 +326,248 @@ async def status_page():
             }}
             
             body {{
-                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 25%, #cbd5e1 50%, #94a3b8 75%, #64748b 100%);
-                background-attachment: fixed;
+                background: #f8fafc;
                 min-height: 100vh;
                 overflow-x: hidden;
             }}
             
-            .glass-card {{
-                backdrop-filter: blur(12px);
-                background: rgba(255, 255, 255, 0.85);
-                border: 1px solid rgba(0, 0, 0, 0.08);
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-                transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
-            }}
-            
-            .glass-card:hover {{
-                transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
-                background: rgba(255, 255, 255, 0.92);
-                border: 1px solid rgba(0, 0, 0, 0.12);
-            }}
-            
-            .glass-header {{
-                backdrop-filter: blur(16px);
-                background: rgba(255, 255, 255, 0.9);
-                border: 1px solid rgba(0, 0, 0, 0.1);
-                box-shadow: 0 6px 30px rgba(0, 0, 0, 0.1);
-            }}
-            
-            .metric-card {{
-                backdrop-filter: blur(8px);
-                background: rgba(255, 255, 255, 0.7);
-                border: 1px solid rgba(0, 0, 0, 0.06);
+            .dashboard-card {{
+                background: white;
+                border: 1px solid #e5e7eb;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
                 transition: all 0.2s ease;
             }}
             
-            .metric-card:hover {{
-                background: rgba(255, 255, 255, 0.85);
-                transform: scale(1.01);
+            .dashboard-card:hover {{
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                transform: translateY(-1px);
+                border-color: #d1d5db;
             }}
             
-            .status-badge {{
-                backdrop-filter: blur(6px);
-                border: 1px solid rgba(0, 0, 0, 0.1);
-                transition: all 0.2s ease;
+            .section-title {{
+                font-size: 0.875rem;
+                font-weight: 600;
+                color: #111827;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
             }}
             
-            .status-online {{
-                background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.8));
-                color: white;
-                box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+            .section-title i {{
+                font-size: 1rem;
+                transition: transform 0.2s ease;
             }}
             
-            .status-warning {{
-                background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(217, 119, 6, 0.8));
-                color: white;
-                box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+            .dashboard-card:hover .section-title i {{
+                transform: scale(1.1);
             }}
-            
-            .status-error {{
-                background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.8));
-                color: white;
-                box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
-            }}
-            
-            .progress-bar {{
-                background: rgba(0, 0, 0, 0.08);
-                border-radius: 6px;
-                overflow: hidden;
-                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-            }}
-            
-            .progress-fill {{
-                height: 6px;
-                border-radius: 6px;
-                transition: width 0.6s cubic-bezier(0.23, 1, 0.320, 1);
-                position: relative;
-            }}
-            
-            .progress-fill::after {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-                animation: shimmer 1.5s infinite;
-            }}
-            
-            @keyframes shimmer {{
-                0% {{ transform: translateX(-100%); }}
-                100% {{ transform: translateX(100%); }}
-            }}
-            
-            .cpu-progress {{ background: linear-gradient(135deg, #8b5cf6, #6366f1); }}
-            .memory-progress {{ background: linear-gradient(135deg, #06b6d4, #0891b2); }}
-            .disk-progress {{ background: linear-gradient(135deg, #10b981, #059669); }}
-            .network-progress {{ background: linear-gradient(135deg, #f59e0b, #d97706); }}
             
             .metric-value {{
-                font-size: 1.8rem;
+                font-size: 2rem;
                 font-weight: 700;
+                color: #111827;
                 line-height: 1;
-                background: linear-gradient(135deg, #1e293b, #334155);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
             }}
             
             .metric-label {{
                 font-size: 0.75rem;
                 font-weight: 500;
-                color: #64748b;
+                color: #6b7280;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
+                margin-top: 0.25rem;
+            }}
+            
+            .status-badge {{
+                display: inline-flex;
+                align-items: center;
+                gap: 0.25rem;
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
+                font-size: 0.75rem;
+                font-weight: 500;
+                transition: all 0.15s ease;
+            }}
+            
+            .status-online {{
+                background: #d1fae5;
+                color: #065f46;
+                border: 1px solid #6ee7b7;
+            }}
+            
+            .status-warning {{
+                background: #fed7aa;
+                color: #92400e;
+                border: 1px solid #fbbf24;
+            }}
+            
+            .status-error {{
+                background: #fee2e2;
+                color: #991b1b;
+                border: 1px solid #fca5a5;
+            }}
+            
+            .progress-bar {{
+                background: #e5e7eb;
+                border-radius: 0.25rem;
+                height: 0.5rem;
+                overflow: hidden;
+                margin: 0.75rem 0;
+            }}
+            
+            .progress-fill {{
+                height: 100%;
+                border-radius: 0.25rem;
+                transition: width 0.3s ease;
+            }}
+            
+            .progress-cpu {{ background: #6366f1; }}
+            .progress-memory {{ background: #06b6d4; }}
+            .progress-disk {{ background: #10b981; }}
+            .progress-network {{ background: #f59e0b; }}
+            
+            .info-row {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.5rem 0;
+                border-bottom: 1px solid #f3f4f6;
+                font-size: 0.875rem;
+            }}
+            
+            .info-row:last-child {{
+                border-bottom: none;
+            }}
+            
+            .info-label {{
+                color: #6b7280;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }}
+            
+            .info-value {{
+                color: #111827;
+                font-weight: 500;
+            }}
+            
+            .model-card {{
+                background: #f9fafb;
+                border: 1px solid #e5e7eb;
+                border-radius: 0.5rem;
+                padding: 1rem;
+                height: 100%;
+            }}
+            
+            .model-card:hover {{
+                background: #f3f4f6;
+            }}
+            
+            .document-item {{
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem;
+                background: #f9fafb;
+                border-radius: 0.375rem;
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+                transition: all 0.15s ease;
+                border: 1px solid transparent;
+            }}
+            
+            .document-item:hover {{
+                background: #f3f4f6;
+                border-color: #e5e7eb;
+                transform: translateX(4px);
+            }}
+            
+            .endpoint-item {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.5rem;
+                background: #f9fafb;
+                border-radius: 0.375rem;
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+                transition: all 0.15s ease;
+                border: 1px solid transparent;
+            }}
+            
+            .endpoint-item:hover {{
+                background: #f3f4f6;
+                border-color: #e5e7eb;
+            }}
+            
+            .cache-button {{
+                padding: 0.5rem 1rem;
+                border-radius: 0.375rem;
+                font-size: 0.875rem;
+                font-weight: 500;
+                text-align: center;
+                transition: all 0.15s ease;
+                cursor: pointer;
+                border: none;
+                width: 100%;
+            }}
+            
+            .cache-button:hover {{
+                transform: translateY(-1px);
+            }}
+            
+            .cache-button-primary {{
+                background: #3b82f6;
+                color: white;
+            }}
+            
+            .cache-button-primary:hover {{
+                background: #2563eb;
+            }}
+            
+            .cache-button-danger {{
+                background: #ef4444;
+                color: white;
+            }}
+            
+            .cache-button-danger:hover {{
+                background: #dc2626;
+            }}
+            
+            .header-card {{
+                background: linear-gradient(135deg, #7c3aed 0%, #6366f1 50%, #0891b2 100%);
+                color: white;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             }}
             
             .pulse-dot {{
-                animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                width: 0.5rem;
+                height: 0.5rem;
+                background: #10b981;
+                border-radius: 50%;
+                animation: pulse 2s infinite;
             }}
             
-            @keyframes pulse-glow {{
-                0%, 100% {{ 
-                    opacity: 1; 
+            @keyframes pulse {{
+                0% {{
                     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
                 }}
-                50% {{ 
-                    opacity: 0.8; 
-                    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+                70% {{
+                    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+                }}
+                100% {{
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
                 }}
             }}
             
-            .api-endpoint {{
-                backdrop-filter: blur(6px);
-                background: rgba(255, 255, 255, 0.6);
-                border: 1px solid rgba(0, 0, 0, 0.06);
-                transition: all 0.2s ease;
-            }}
-            
-            .api-endpoint:hover {{
-                background: rgba(255, 255, 255, 0.8);
-                border: 1px solid rgba(0, 0, 0, 0.1);
-                transform: translateX(2px);
+            .equal-height {{
+                min-height: 320px;
             }}
             
             .scrollbar-thin {{
                 scrollbar-width: thin;
-                scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+                scrollbar-color: #d1d5db transparent;
             }}
             
             .scrollbar-thin::-webkit-scrollbar {{
@@ -431,163 +579,90 @@ async def status_page():
             }}
             
             .scrollbar-thin::-webkit-scrollbar-thumb {{
-                background: rgba(0, 0, 0, 0.2);
+                background: #d1d5db;
                 border-radius: 2px;
-            }}
-            
-            .text-gradient {{
-                background: linear-gradient(135deg, #1e293b, #334155);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            }}
-            
-            .compact-text {{
-                font-size: 0.875rem;
-                line-height: 1.2;
-            }}
-            
-            .compact-title {{
-                font-size: 1.0rem;
-                font-weight: 600;
-                margin-bottom: 0.5rem;
-            }}
-            
-            .equal-height {{
-                min-height: 280px;
             }}
         </style>
     </head>
     <body>
-        <div class="min-h-screen py-2 px-3 sm:px-4">
+        <div class="min-h-screen p-4 sm:p-6 lg:p-8">
             <div class="max-w-7xl mx-auto">
-                <!-- Compact Header -->
-                <header class="text-center mb-3">
-                    <div class="glass-header rounded-2xl p-3 mb-3">
-                        <div class="flex items-center justify-center mb-2">
-                            <div class="relative">
-                                <i class="fas fa-robot text-3xl text-gradient mr-2"></i>
-                                <div class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full pulse-dot"></div>
-                            </div>
+                <!-- Header -->
+                <div class="header-card rounded-lg p-6 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h1 class="text-3xl font-bold flex items-center gap-3">
+                                <i class="fas fa-robot"></i>
+                                AQu API Dashboard
+                            </h1>
+                            <p class="text-blue-100 mt-2">AI-powered Question Answering System</p>
                         </div>
-                        <h1 class="text-2xl sm:text-3xl font-bold text-gradient mb-2">
-                            AQu API Dashboard
-                        </h1>
-                        <p class="text-sm text-gray-600 mb-3 leading-tight">
-                            AI-powered Question Answering System • Real-time Monitoring
-                        </p>
-                        <div class="flex items-center justify-center space-x-4">
-                            <div class="status-badge status-online px-3 py-1 rounded-full font-medium text-xs">
-                                <div class="w-1.5 h-1.5 bg-white rounded-full inline-block mr-1 pulse-dot"></div>
-                                Online
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <div class="pulse-dot"></div>
+                                <span class="text-sm">System Online</span>
                             </div>
-                            <button onclick="location.reload()" class="status-badge px-3 py-1 rounded-full font-medium text-xs text-gray-600 hover:text-gray-800 transition-colors bg-white/70">
-                                <i class="fas fa-sync-alt mr-1"></i>
+                            <button onclick="location.reload()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                                <i class="fas fa-sync-alt mr-2"></i>
                                 Refresh
                             </button>
                         </div>
                     </div>
-                </header>
+                </div>
 
-                <!-- System Overview Grid -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
-                    <!-- AI Models Status -->
+                <!-- Main Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+                    <!-- AI Models Status - spans 2 columns -->
                     <div class="lg:col-span-2">
-                        <div class="glass-card rounded-xl p-3 h-48">
-                            <div class="flex items-center justify-between mb-2">
-                                <h2 class="compact-title text-gradient flex items-center">
-                                    <i class="fas fa-brain mr-2 text-blue-600"></i>
-                                    AI Models Status
-                                </h2>
-                                <div class="status-badge {'status-online' if '✅' in ai_status['overall_status'] else 'status-warning' if '⚠️' in ai_status['overall_status'] else 'status-error'} px-2 py-1 rounded-lg font-medium text-xs">
-                                    {ai_status['overall_status'].split()[0]}
-                                </div>
+                        <div class="dashboard-card rounded-lg p-6 h-full">
+                            <div class="section-title">
+                                <i class="fas fa-brain text-violet-600"></i>
+                                AI Models Status
+                                <span class="ml-auto status-badge {'status-online' if '✅' in ai_status['overall_status'] else 'status-warning' if '⚠️' in ai_status['overall_status'] else 'status-error'}">
+                                    {ai_status['overall_status'].replace('AI Models Status: ', '')}
+                                </span>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 h-36 overflow-hidden">
-                                {_generate_compact_ai_model_cards(ai_status.get('models', {}))}
+                            <div class="grid grid-cols-3 gap-3">
+                                {_generate_ai_model_cards(ai_status.get('models', {}))}
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Enhanced System Stats -->
-                    <div>
-                        <div class="glass-card rounded-xl p-3 h-48">
-                            <h3 class="compact-title text-gradient flex items-center">
-                                <i class="fas fa-tachometer-alt mr-2 text-green-600"></i>
+                    <!-- System Overview -->
+                    <div class="lg:col-span-2">
+                        <div class="dashboard-card rounded-lg p-6 h-full">
+                            <div class="section-title">
+                                <i class="fas fa-server text-sky-600"></i>
                                 System Overview
-                            </h3>
-                            <div class="space-y-1 h-36 overflow-y-auto scrollbar-thin">
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-server mr-1 text-blue-500"></i>
-                                            Platform:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{system_info.get('platform', {}).get('system', 'Unknown')}</span>
-                                    </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="info-row">
+                                    <span class="info-label">
+                                        <i class="fas fa-desktop text-gray-400"></i>
+                                        Platform
+                                    </span>
+                                    <span class="info-value">{system_info.get('platform', {}).get('system', 'Unknown')}</span>
                                 </div>
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-clock mr-1 text-purple-500"></i>
-                                            Uptime:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{system_info.get('uptime', {}).get('uptime_formatted', 'Unknown')}</span>
-                                    </div>
+                                <div class="info-row">
+                                    <span class="info-label">
+                                        <i class="fas fa-clock text-gray-400"></i>
+                                        Uptime
+                                    </span>
+                                    <span class="info-value">{system_info.get('uptime', {}).get('uptime_formatted', 'Unknown')}</span>
                                 </div>
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-cog mr-1 text-orange-500"></i>
-                                            PID:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{system_info.get('process', {}).get('pid', 'N/A')}</span>
-                                    </div>
+                                <div class="info-row">
+                                    <span class="info-label">
+                                        <i class="fas fa-hashtag text-gray-400"></i>
+                                        PID
+                                    </span>
+                                    <span class="info-value">{system_info.get('process', {}).get('pid', 'N/A')}</span>
                                 </div>
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-file-pdf mr-1 text-red-500"></i>
-                                            Documents:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{len(pdfs)} loaded</span>
-                                    </div>
-                                </div>
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-code mr-1 text-cyan-500"></i>
-                                            Python:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{system_info.get('platform', {}).get('python_version', 'Unknown')}</span>
-                                    </div>
-                                </div>
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-memory mr-1 text-indigo-500"></i>
-                                            Process RAM:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{system_info.get('process', {}).get('memory_rss_mb', 0):.0f}MB</span>
-                                    </div>
-                                </div>
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-microchip mr-1 text-pink-500"></i>
-                                            Architecture:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{system_info.get('platform', {}).get('architecture', 'Unknown')}</span>
-                                    </div>
-                                </div>
-                                <div class="metric-card rounded p-1.5">
-                                    <div class="flex items-center justify-between text-xs">
-                                        <span class="text-gray-600 flex items-center">
-                                            <i class="fas fa-tasks mr-1 text-yellow-500"></i>
-                                            Threads:
-                                        </span>
-                                        <span class="font-medium text-gray-800">{system_info.get('process', {}).get('num_threads', 'N/A')}</span>
-                                    </div>
+                                <div class="info-row">
+                                    <span class="info-label">
+                                        <i class="fas fa-file-alt text-gray-400"></i>
+                                        Documents
+                                    </span>
+                                    <span class="info-value">{len(pdfs)} loaded</span>
                                 </div>
                             </div>
                         </div>
@@ -595,145 +670,187 @@ async def status_page():
                 </div>
 
                 <!-- Performance Metrics -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-                    <!-- CPU Metrics -->
-                    <div class="glass-card rounded-xl p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="compact-text font-semibold text-gray-800 flex items-center">
-                                <i class="fas fa-microchip mr-1 text-purple-600"></i>
-                                CPU
-                            </h3>
-                            <span class="text-xs text-gray-500">{system_info.get('cpu', {}).get('count', 0)} cores</span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <!-- CPU -->
+                    <div class="dashboard-card rounded-lg p-6">
+                        <div class="section-title">
+                            <i class="fas fa-microchip text-indigo-600"></i>
+                            CPU
+                            <span class="ml-auto text-xs text-gray-500">{system_info.get('cpu', {}).get('count', 0)} cores</span>
                         </div>
-                        <div class="text-center mb-2">
-                            <div class="metric-value text-lg">{system_info.get('cpu', {}).get('usage_percent', 0):.1f}%</div>
+                        <div class="text-center mb-3">
+                            <div class="metric-value">{system_info.get('cpu', {}).get('usage_percent', 0):.1f}%</div>
                             <div class="metric-label">Usage</div>
                         </div>
-                        <div class="progress-bar mb-2">
-                            <div class="progress-fill cpu-progress" style="width: {system_info.get('cpu', {}).get('usage_percent', 0)}%"></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill progress-cpu" style="width: {system_info.get('cpu', {}).get('usage_percent', 0)}%"></div>
                         </div>
-                        <div class="text-xs text-gray-500 flex justify-between">
+                        <div class="flex justify-between text-xs text-gray-500 mt-3">
                             <span>Freq: {system_info.get('cpu', {}).get('frequency', {}).get('current', 0):.0f}MHz</span>
                             <span>Load: {system_info.get('cpu', {}).get('load_average', [0])[0]:.1f}</span>
                         </div>
                     </div>
 
-                    <!-- Memory Metrics -->
-                    <div class="glass-card rounded-xl p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="compact-text font-semibold text-gray-800 flex items-center">
-                                <i class="fas fa-memory mr-1 text-cyan-600"></i>
-                                Memory
-                            </h3>
-                            <span class="text-xs text-gray-500">{system_info.get('memory', {}).get('total_gb', 0):.0f}GB</span>
+                    <!-- Memory -->
+                    <div class="dashboard-card rounded-lg p-6">
+                        <div class="section-title">
+                            <i class="fas fa-memory text-cyan-600"></i>
+                            Memory
+                            <span class="ml-auto text-xs text-gray-500">{system_info.get('memory', {}).get('total_gb', 0):.0f}GB</span>
                         </div>
-                        <div class="text-center mb-2">
-                            <div class="metric-value text-lg">{system_info.get('memory', {}).get('percentage', 0):.1f}%</div>
+                        <div class="text-center mb-3">
+                            <div class="metric-value">{system_info.get('memory', {}).get('percentage', 0):.1f}%</div>
                             <div class="metric-label">Used</div>
                         </div>
-                        <div class="progress-bar mb-2">
-                            <div class="progress-fill memory-progress" style="width: {system_info.get('memory', {}).get('percentage', 0)}%"></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill progress-memory" style="width: {system_info.get('memory', {}).get('percentage', 0)}%"></div>
                         </div>
-                        <div class="text-xs text-gray-500 flex justify-between">
+                        <div class="flex justify-between text-xs text-gray-500 mt-3">
                             <span>Used: {system_info.get('memory', {}).get('used_gb', 0):.1f}GB</span>
                             <span>Free: {system_info.get('memory', {}).get('available_gb', 0):.1f}GB</span>
                         </div>
                     </div>
 
-                    <!-- Disk Metrics -->
-                    <div class="glass-card rounded-xl p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="compact-text font-semibold text-gray-800 flex items-center">
-                                <i class="fas fa-hdd mr-1 text-green-600"></i>
-                                Storage
-                            </h3>
-                            <span class="text-xs text-gray-500">{system_info.get('disk', {}).get('total_gb', 0):.0f}GB</span>
+                    <!-- Storage -->
+                    <div class="dashboard-card rounded-lg p-6">
+                        <div class="section-title">
+                            <i class="fas fa-hdd text-emerald-600"></i>
+                            Storage
+                            <span class="ml-auto text-xs text-gray-500">{system_info.get('disk', {}).get('total_gb', 0):.0f}GB</span>
                         </div>
-                        <div class="text-center mb-2">
-                            <div class="metric-value text-lg">{system_info.get('disk', {}).get('percentage', 0):.1f}%</div>
+                        <div class="text-center mb-3">
+                            <div class="metric-value">{system_info.get('disk', {}).get('percentage', 0):.1f}%</div>
                             <div class="metric-label">Used</div>
                         </div>
-                        <div class="progress-bar mb-2">
-                            <div class="progress-fill disk-progress" style="width: {system_info.get('disk', {}).get('percentage', 0)}%"></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill progress-disk" style="width: {system_info.get('disk', {}).get('percentage', 0)}%"></div>
                         </div>
-                        <div class="text-xs text-gray-500 flex justify-between">
+                        <div class="flex justify-between text-xs text-gray-500 mt-3">
                             <span>Used: {system_info.get('disk', {}).get('used_gb', 0):.0f}GB</span>
                             <span>Free: {system_info.get('disk', {}).get('free_gb', 0):.0f}GB</span>
                         </div>
                     </div>
 
-                    <!-- Network Metrics -->
-                    <div class="glass-card rounded-xl p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="compact-text font-semibold text-gray-800 flex items-center">
-                                <i class="fas fa-network-wired mr-1 text-orange-600"></i>
-                                Network
-                            </h3>
-                            <span class="text-xs text-gray-500">I/O</span>
+                    <!-- Network -->
+                    <div class="dashboard-card rounded-lg p-6">
+                        <div class="section-title">
+                            <i class="fas fa-network-wired text-amber-600"></i>
+                            Network
+                            <span class="ml-auto text-xs text-gray-500">I/O</span>
                         </div>
-                        <div class="text-center mb-2">
-                            <div class="metric-value text-lg">{system_info.get('network', {}).get('bytes_sent_mb', 0):.0f}</div>
+                        <div class="text-center mb-3">
+                            <div class="metric-value">{int(system_info.get('network', {}).get('bytes_sent_mb', 0))}</div>
                             <div class="metric-label">MB Sent</div>
                         </div>
-                        <div class="text-xs text-gray-500 space-y-1">
-                            <div class="flex justify-between">
-                                <span>Received:</span>
-                                <span>{system_info.get('network', {}).get('bytes_recv_mb', 0):.0f}MB</span>
+                        <div class="mt-4 space-y-2">
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-500">Received:</span>
+                                <span class="text-gray-700 font-medium">{int(system_info.get('network', {}).get('bytes_recv_mb', 0))}MB</span>
                             </div>
-                            <div class="flex justify-between">
-                                <span>Packets:</span>
-                                <span>{system_info.get('network', {}).get('packets_sent', 0):,}</span>
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-500">Packets:</span>
+                                <span class="text-gray-700 font-medium">{system_info.get('network', {}).get('packets_sent', 0):,}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Bottom Grid: Documents & API Endpoints -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-2">
-                    <!-- PDF Documents -->
-                    <div class="glass-card rounded-xl p-3 h-32">
-                        <h3 class="text-sm font-semibold text-gradient flex items-center mb-2">
-                            <i class="fas fa-file-pdf mr-2 text-red-600"></i>
+                <!-- Bottom Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Document Library -->
+                    <div class="dashboard-card rounded-lg p-6 equal-height">
+                        <div class="section-title">
+                            <i class="fas fa-file-pdf text-rose-600"></i>
                             Document Library
-                            <span class="ml-auto text-xs font-normal bg-red-100 px-2 py-1 rounded-full text-red-700">
+                            <span class="ml-auto status-badge status-online">
                                 {len(pdfs)} loaded
                             </span>
-                        </h3>
-                        <div class="space-y-1 h-20 overflow-y-auto scrollbar-thin">
-                            {_generate_compact_pdf_list(pdfs)}
+                        </div>
+                        <div class="overflow-y-auto scrollbar-thin" style="max-height: 250px;">
+                            {_generate_pdf_list(pdfs)}
                         </div>
                     </div>
 
-                    <!-- API Endpoints with Status -->
-                    <div class="glass-card rounded-xl p-3 h-32">
-                        <h3 class="text-sm font-semibold text-gradient flex items-center mb-2">
-                            <i class="fas fa-plug mr-2 text-emerald-600"></i>
-                            API Endpoints Status
-                        </h3>
-                        <div class="space-y-1 h-20 overflow-y-auto scrollbar-thin">
-                            {_generate_api_endpoints_with_status(endpoint_status)}
+                    <!-- Redis & Cache System -->
+                    <div class="dashboard-card rounded-lg p-6 equal-height">
+                        <div class="section-title">
+                            <i class="fas fa-database text-orange-600"></i>
+                            Redis & Cache System
+                            <span class="ml-auto status-badge {'status-online' if redis_status.get('connected') else 'status-error'}">
+                                {'Connected' if redis_status.get('connected') else 'Disconnected'}
+                            </span>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="info-row">
+                                <span class="info-label">Host</span>
+                                <span class="info-value font-mono text-sm">{redis_status.get('host', 'N/A')}:{redis_status.get('port', 'N/A')}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Memory Used</span>
+                                <span class="info-value">{cache_stats.get('memory', {}).get('used_memory_human', 'N/A')}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Cache Items</span>
+                                <span class="info-value">{cache_stats.get('cache_items', {}).get('cached_queries', 0)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Hit Rate</span>
+                                <span class="info-value text-green-600 font-bold">{cache_stats.get('performance', {}).get('hit_rate', 0):.1f}%</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Total Queries</span>
+                                <span class="info-value">{cache_stats.get('performance', {}).get('total_queries', 0)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Cache Hits</span>
+                                <span class="info-value text-green-600">{cache_stats.get('performance', {}).get('cache_hits', 0)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Cache Misses</span>
+                                <span class="info-value text-orange-600">{cache_stats.get('performance', {}).get('cache_misses', 0)}</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">TTL</span>
+                                <span class="info-value">{redis_status.get('cache_ttl', 3600)}s</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 mt-4">
+                                <a href="/api/download-question-logs" class="cache-button cache-button-primary text-decoration-none">
+                                    <i class="fas fa-download mr-2"></i>
+                                    Download CSV
+                                </a>
+                                <button onclick="clearCache()" class="cache-button cache-button-danger">
+                                    <i class="fas fa-trash mr-2"></i>
+                                    Clear Cache
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Compact Footer -->
-                <footer class="text-center">
-                    <div class="glass-card rounded-xl p-2">
-                        <div class="flex flex-col sm:flex-row items-center justify-between text-gray-600 text-xs">
-                            <div class="flex items-center space-x-3 mb-1 sm:mb-0">
-                                <i class="fas fa-clock"></i>
-                                <span>Updated: {datetime.datetime.now().strftime('%H:%M:%S')} UTC</span>
-                            </div>
-                            <div class="flex items-center space-x-3">
-                                <span>PID: {system_info.get('process', {}).get('pid', 'N/A')}</span>
-                                <span>•</span>
-                                <span>Threads: {system_info.get('process', {}).get('num_threads', 'N/A')}</span>
-                                <span>•</span>
-                                <span>Python {system_info.get('platform', {}).get('python_version', 'N/A')}</span>
-                            </div>
-                        </div>
+                <!-- API Endpoints Status -->
+                <div class="dashboard-card rounded-lg p-6 mt-6">
+                    <div class="section-title">
+                        <i class="fas fa-plug text-teal-600"></i>
+                        API Endpoints Status
                     </div>
-                </footer>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {_generate_api_endpoints(endpoint_status)}
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="text-center mt-8 text-sm text-gray-500">
+                    <div class="flex items-center justify-center gap-6">
+                        <span>
+                            <i class="fas fa-clock mr-1"></i>
+                            Updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC
+                        </span>
+                        <span>•</span>
+                        <span>PID: {system_info.get('process', {}).get('pid', 'N/A')}</span>
+                        <span>•</span>
+                        <span>Python {system_info.get('platform', {}).get('python_version', 'N/A')}</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -742,72 +859,78 @@ async def status_page():
             setTimeout(() => {{
                 location.reload();
             }}, 30000);
+            
+            // Function to clear Redis cache
+            async function clearCache() {{
+                if (confirm('Are you sure you want to clear the Redis cache? This will remove all cached responses.')) {{
+                    try {{
+                        const response = await fetch('/api/clear-cache', {{ method: 'POST' }});
+                        const result = await response.json();
+                        if (result.success) {{
+                            alert('Cache cleared successfully!');
+                            location.reload();
+                        }} else {{
+                            alert('Failed to clear cache: ' + result.message);
+                        }}
+                    }} catch (error) {{
+                        alert('Error clearing cache: ' + error.message);
+                    }}
+                }}
+            }}
         </script>
     </body>
     </html>
     """
     return HTMLResponse(content=html_content)
 
-def _generate_compact_ai_model_cards(models: dict) -> str:
-    """Generate compact AI model cards for light theme."""
+def _generate_ai_model_cards(models: dict) -> str:
+    """Generate AI model cards with consistent styling."""
     if not models:
         return """
-        <div class='col-span-3 text-center py-6'>
-            <i class='fas fa-exclamation-triangle text-2xl text-orange-500 mb-2'></i>
-            <p class='text-gray-600 text-sm'>No AI models status available</p>
+        <div class='col-span-3 text-center py-8'>
+            <i class='fas fa-exclamation-triangle text-3xl text-amber-500 mb-3'></i>
+            <p class='text-gray-600'>No AI models status available</p>
         </div>
         """
     
     cards = []
     model_names = {"mini": "GPT-4o-Mini", "main": "GPT-4o", "nano": "GPT-4o-Nano"}
-    model_icons = {"mini": "fas fa-bolt", "main": "fas fa-brain", "nano": "fas fa-check-circle"}
-    model_colors = {"mini": "text-yellow-600", "main": "text-blue-600", "nano": "text-green-600"}
+    model_icons = {"mini": "fas fa-bolt", "main": "fas fa-brain", "nano": "fas fa-leaf"}
+    model_colors = {"mini": "text-amber-600", "main": "text-violet-600", "nano": "text-emerald-600"}
     
     for model_type, model_info in models.items():
-        status_icon = "✅" if "✅" in model_info.get("status", "") else "❌"
-        status_class = "status-online" if "✅" in model_info.get("status", "") else "status-error"
+        status_ok = "✅" in model_info.get("status", "")
         response_time = model_info.get('response_time_ms', 0)
         
-        # Performance indicator
-        if response_time < 1000:
-            perf_class = "text-green-600"
-            perf_icon = "fas fa-rocket"
-        elif response_time < 3000:
-            perf_class = "text-yellow-600"
-            perf_icon = "fas fa-clock"
-        else:
-            perf_class = "text-red-600"
-            perf_icon = "fas fa-hourglass-half"
-        
         card = f"""
-        <div class="metric-card rounded-lg p-3">
-            <div class="flex items-center justify-between mb-2">
-                <h4 class="compact-text font-semibold text-gray-800 flex items-center">
-                    <i class="{model_icons.get(model_type, 'fas fa-robot')} mr-1 {model_colors.get(model_type, 'text-blue-600')}"></i>
+        <div class="model-card">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold text-gray-800 flex items-center gap-2">
+                    <i class="{model_icons.get(model_type, 'fas fa-robot')} {model_colors.get(model_type, 'text-gray-600')}"></i>
                     {model_names.get(model_type, model_type.title())}
                 </h4>
-                <span class="text-xs {status_class if status_icon == '✅' else 'text-red-600'}">{status_icon}</span>
+                <span class="{'text-emerald-600' if status_ok else 'text-rose-600'}">
+                    {'✅' if status_ok else '❌'}
+                </span>
             </div>
             
-            <div class="space-y-1">
-                <div class="flex justify-between items-center text-xs">
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
                     <span class="text-gray-500">Model:</span>
-                    <span class="text-gray-700 font-medium">{model_info.get('model_name', 'Unknown')[:20]}...</span>
+                    <span class="text-gray-700 font-medium text-xs">{model_info.get('model_name', 'Unknown')[:20]}...</span>
                 </div>
                 
-                <div class="flex justify-between items-center text-xs">
+                <div class="flex justify-between">
                     <span class="text-gray-500">Response:</span>
-                    <span class="text-gray-700 font-medium flex items-center">
-                        <i class="{perf_icon} mr-1 {perf_class}"></i>
+                    <span class="text-gray-700 font-medium">
                         {response_time}ms
                     </span>
                 </div>
                 
-                <div class="text-xs text-gray-500">
-                    Functions: {len(model_info.get("functions", []))} available
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Functions:</span>
+                    <span class="text-gray-700">{len(model_info.get("functions", []))} available</span>
                 </div>
-                
-                {"<div class='mt-2 p-1 bg-red-50 rounded text-red-600 text-xs'><i class='fas fa-exclamation-triangle mr-1'></i>" + model_info.get('error', '')[:30] + "...</div>" if model_info.get('error') else ""}
             </div>
         </div>
         """
@@ -815,79 +938,53 @@ def _generate_compact_ai_model_cards(models: dict) -> str:
     
     return "".join(cards)
 
-def _generate_compact_pdf_list(pdfs: list) -> str:
-    """Generate compact PDF list for light theme."""
+def _generate_pdf_list(pdfs: list) -> str:
+    """Generate PDF list with consistent styling."""
     if not pdfs:
         return """
-        <div class='text-center py-4'>
-            <i class='fas fa-file-pdf text-xl text-red-400 mb-2'></i>
-            <p class='text-gray-500 text-xs'>No documents loaded</p>
+        <div class='text-center py-8'>
+            <i class='fas fa-file-pdf text-3xl text-gray-400 mb-3'></i>
+            <p class='text-gray-500'>No documents loaded</p>
         </div>
         """
     
     pdf_items = []
-    for i, pdf in enumerate(pdfs[:8]):  # Limit to 8 items for compactness
+    for i, pdf in enumerate(pdfs):
         pdf_name = pdf.split('/')[-1] if '/' in pdf else pdf
         pdf_items.append(f"""
-        <div class="api-endpoint rounded p-2 flex items-center justify-between">
-            <div class="flex items-center">
-                <i class="fas fa-file-pdf mr-2 text-red-500 text-xs"></i>
-                <span class="text-gray-700 text-xs font-medium truncate">{pdf_name[:25]}{'...' if len(pdf_name) > 25 else ''}</span>
-            </div>
-            <span class="text-xs text-gray-400">#{i + 1}</span>
-        </div>
-        """)
-    
-    if len(pdfs) > 8:
-        pdf_items.append(f"""
-        <div class="text-center py-1">
-            <span class="text-xs text-gray-500">+{len(pdfs)-8} more documents...</span>
+        <div class="document-item">
+            <i class="fas fa-file-pdf text-rose-500"></i>
+            <span class="text-gray-700 truncate" title="{pdf_name}">{pdf_name[:40]}{'...' if len(pdf_name) > 40 else ''}</span>
+            <span class="ml-auto text-xs text-gray-400">#{i + 1}</span>
         </div>
         """)
     
     return "".join(pdf_items)
 
-def _generate_api_endpoints_with_status(endpoint_status: dict) -> str:
-    """Generate API endpoints with their testing status."""
+def _generate_api_endpoints(endpoint_status: dict) -> str:
+    """Generate API endpoints with consistent styling."""
     if not endpoint_status:
         return """
-        <div class='text-center py-4'>
-            <i class='fas fa-exclamation-triangle text-xl text-orange-400 mb-2'></i>
-            <p class='text-gray-500 text-xs'>Could not test API endpoints</p>
+        <div class='col-span-3 text-center py-8'>
+            <i class='fas fa-exclamation-triangle text-3xl text-amber-500 mb-3'></i>
+            <p class='text-gray-500'>Could not test API endpoints</p>
         </div>
         """
     
     endpoint_items = []
     for name, status_info in endpoint_status.items():
-        status_icon = status_info.get("status", "❌ Unknown").split()[0]
-        
-        if "✅" in status_icon:
-            status_class = "text-green-600"
-            bg_class = "bg-green-50"
-        elif "⚠️" in status_icon:
-            status_class = "text-yellow-600"
-            bg_class = "bg-yellow-50"
-        else:
-            status_class = "text-red-600"
-            bg_class = "bg-red-50"
-        
+        status_ok = "✅" in status_info.get("status", "")
         response_time = status_info.get("response_time", 0)
-        status_code = status_info.get("status_code", "")
-        error = status_info.get("error", "")
         
         endpoint_items.append(f"""
-        <div class="api-endpoint rounded p-2 {bg_class}">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <span class="text-xs {status_class} mr-2">{status_icon}</span>
-                    <span class="text-gray-700 text-xs font-medium">{name}</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                    {f'<span class="text-xs text-gray-500">{response_time}ms</span>' if response_time > 0 else ''}
-                    {f'<span class="text-xs {status_class}">{status_code}</span>' if status_code else ''}
-                </div>
+        <div class="endpoint-item">
+            <div class="flex items-center gap-2">
+                <span class="{'text-emerald-600' if status_ok else 'text-rose-600'}">
+                    {'✅' if status_ok else '❌'}
+                </span>
+                <span class="text-gray-700 font-medium">{name}</span>
             </div>
-            {f'<div class="text-xs text-red-500 mt-1 truncate">{error}</div>' if error else ''}
+            <span class="text-xs text-gray-500">{response_time}ms</span>
         </div>
         """)
     

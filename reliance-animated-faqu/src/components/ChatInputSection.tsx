@@ -121,32 +121,36 @@ const ChatInputSection: React.FC<ChatInputSectionProps> = ({
   };
 
   const handleInputFocus = () => {
+    console.log("Input focused - moving chatbox to top");
     setIsInputFocused(true);
   };
 
-  const handleInputBlur = () => {
+  const handleInputBlur = (e?: React.FocusEvent<HTMLInputElement>) => {
     // Don't handle blur during transition to prevent interference
     if (isTransitioning) return;
     
-    const inputElement = document.querySelector('input');
-    if (!inputElement || !inputElement.value.trim()) {
-      setIsInputFocused(false);
-    }
+    // Allow blur to reset focus state more reliably
+    setTimeout(() => {
+      // Check if the focus has moved to another element within the chat container
+      const activeElement = document.activeElement;
+      const chatContainer = document.querySelector('[data-chat-container]');
+      const isFocusWithinChat = chatContainer?.contains(activeElement);
+      
+      // Also check if there's text in the input
+      const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+      const hasText = inputElement?.value?.trim();
+      
+      // Only reset focus if focus has truly left the chat area and there's no text
+      if (!isFocusWithinChat && !hasText) {
+        console.log("Input blurred - resetting chatbox position");
+        setIsInputFocused(false);
+      }
+    }, 100);
   };
 
   return (
     <motion.div 
       className="w-full"
-      animate={{
-        y: (isInputFocused || isReturnedFromResponse) ? "-30vh" : 0,
-        marginTop: (isInputFocused || isReturnedFromResponse) ? "2rem" : "0",
-      }}
-      transition={{ 
-        type: "spring", 
-        stiffness: 300, 
-        damping: 30,
-        delay: (isInputFocused || isReturnedFromResponse) ? 0.3 : 0
-      }}
       initial={false}
     >
       <MovingBorderCard

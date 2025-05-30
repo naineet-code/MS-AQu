@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { ChevronDown, Copy, Check, HelpCircle, Loader2, FileText, Brain, DollarSign, Quote, BookOpen, Database, Zap } from "lucide-react";
+import { ChevronDown, Copy, Check, HelpCircle, Loader2, FileText, Brain, DollarSign, Quote, BookOpen, Database, Zap, RefreshCw, ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/hooks/useTheme";
 import { marked } from 'marked';
@@ -9,6 +9,9 @@ import { aiFormatter } from '@/utils/aiFormatter';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import ResponseScrollHint from './ResponseScrollHint';
+import { buttonVariants } from "@/components/ui/button";
+import type { VariantProps } from "class-variance-authority";
+import { ScrollHint } from "./ui/scroll-hint";
 
 // Configure marked for enhanced rendering
 marked.setOptions({
@@ -65,16 +68,16 @@ interface ResponseCardProps {
     success?: boolean;
     timestamp?: number;
     cache_hit?: boolean;  // Cache status from API response
+    similarity_score?: number;
   };
   backendUrl: string | null;
+  onForceNoCache?: () => void;
+  showScrollHint?: boolean;
+  onScroll?: (isAtBottom: boolean) => void;
 }
 
 // Copy Button Component
-const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md'; variant?: 'ghost' | 'secondary' }> = ({ 
-  text, 
-  size = 'md',
-  variant = 'ghost'
-}) => {
+const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   const [copied, setCopied] = useState(false);
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -102,21 +105,13 @@ const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md'; variant?: 'ghost'
     }
   };
 
-  const sizeClasses = {
-    sm: 'h-7 w-7',
-    md: 'h-8 w-8'
-  };
-
-  // Map custom sizes to Button component sizes
-  const buttonSize = size === 'sm' ? 'sm' : 'default';
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant={variant}
+          variant="ghost"
           size="icon"
-          className={`${sizeClasses[size]} ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
           onClick={handleCopy}
         >
           <AnimatePresence mode="wait">
@@ -128,7 +123,7 @@ const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md'; variant?: 'ghost'
                 exit={{ scale: 0.5, opacity: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <Check className={`h-4 w-4 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
+                <Check className={`h-5 w-5 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
               </motion.div>
             ) : (
               <motion.div
@@ -138,7 +133,7 @@ const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md'; variant?: 'ghost'
                 exit={{ scale: 0.5, opacity: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <Copy className={`h-4 w-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
+                <Copy className={`h-5 w-5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -206,7 +201,7 @@ const SectionHeader: React.FC<{
         isHovered ? 'text-lg' : 'text-base'
       } ${isDark ? 'text-gray-200' : 'text-gray-800'}`,
       icon: `transition-all duration-300 ${
-        isHovered ? 'h-5 w-5' : 'h-4 w-4'
+        isHovered ? 'h-6 w-6' : 'h-5 w-5'
       } ${isDark ? 'text-gray-400' : 'text-gray-600'}`
     }
   };
@@ -292,7 +287,7 @@ const SectionHeader: React.FC<{
             animate={{ scale: isHovered ? 1.1 : 1 }}
             transition={{ duration: 0.2 }}
           >
-            <CopyButton text={copyText} size="md" variant="secondary" />
+            <CopyButton text={copyText} />
           </motion.div>
         )}
       </div>
@@ -339,7 +334,7 @@ const ContentContainer: React.FC<{
 };
 
 // Rich Text Renderer with enhanced styling
-const RichTextRenderer: React.FC<{ content: string; backendUrl?: string | null }> = React.memo(({ content, backendUrl }) => {
+export const RichTextRenderer: React.FC<{ content: string; backendUrl?: string | null }> = React.memo(({ content, backendUrl }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -526,7 +521,15 @@ const ExpandableText: React.FC<{ text: string; maxLength?: number }> = ({ text, 
 };
 
 // Cache Status Icon Component
-const CacheStatusIcon: React.FC<{ cacheHit?: boolean }> = ({ cacheHit }) => {
+const CacheStatusIcon: React.FC<{ 
+  cacheHit?: boolean;
+  verification?: {
+    confidence: number;
+    reason: string;
+  } | null;
+  similarityScore?: number;
+  onForceNoCache?: () => void;
+}> = ({ cacheHit, verification, similarityScore, onForceNoCache }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -536,67 +539,209 @@ const CacheStatusIcon: React.FC<{ cacheHit?: boolean }> = ({ cacheHit }) => {
   }
 
   const isFromCache = cacheHit === true;
+  const confidence = verification?.confidence || 0;
+  const similarity = similarityScore || 0;
+  
+  // Create a cleaner display for cached responses
+  const getCacheDisplayText = () => {
+    if (!isFromCache) {
+      return "Fresh";
+    }
+    
+    // For cached responses, show the most relevant metric
+    if (similarity > 0 && similarity < 1) {
+      // Show similarity score for fuzzy matches
+      return `Cached (${(similarity * 100).toFixed(0)}% match)`;
+    } else if (confidence > 0) {
+      // Show confidence for verified matches
+      return `Cached (${confidence}% confidence)`;
+    } else if (similarity === 1) {
+      // Exact match
+      return "Cached (exact match)";
+    } else {
+      // Fallback
+      return "Cached";
+    }
+  };
   
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <motion.div
-          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-            isFromCache
-              ? isDark 
-                ? 'bg-blue-900/30 text-blue-300 border border-blue-500/30' 
-                : 'bg-blue-100 text-blue-700 border border-blue-300/30'
-              : isDark 
-                ? 'bg-green-900/30 text-green-300 border border-green-500/30' 
-                : 'bg-green-100 text-green-700 border border-green-300/30'
-          }`}
-          whileHover={{ scale: 1.05 }}
-          transition={{ duration: 0.2 }}
-        >
-          {isFromCache ? (
-            <>
-              <Database className="h-3 w-3" />
-              <span>Cached</span>
-            </>
-          ) : (
-            <>
-              <Zap className="h-3 w-3" />
-              <span>Fresh</span>
-            </>
-          )}
-        </motion.div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <div className="text-center">
-          <p className="font-medium">
-            {isFromCache ? 'Response from Cache' : 'Freshly Generated'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {isFromCache 
-              ? 'This answer was retrieved from our cache for faster response times' 
-              : 'This answer was freshly generated by our AI models'
-            }
-          </p>
-        </div>
-      </TooltipContent>
-    </Tooltip>
+    <div className="flex items-center gap-2">
+      <motion.div
+        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+          isFromCache
+            ? isDark 
+              ? 'bg-blue-900/30 text-blue-300 border border-blue-500/30' 
+              : 'bg-blue-100 text-blue-700 border border-blue-300/30'
+            : isDark 
+              ? 'bg-green-900/30 text-green-300 border border-green-500/30' 
+              : 'bg-green-100 text-green-700 border border-green-300/30'
+        }`}
+        whileHover={{ scale: 1.05 }}
+        transition={{ duration: 0.2 }}
+      >
+        {isFromCache ? (
+          <>
+            <Database className="h-3 w-3" />
+            <span>{getCacheDisplayText()}</span>
+          </>
+        ) : (
+          <>
+            <Zap className="h-3 w-3" />
+            <span>Fresh</span>
+          </>
+        )}
+      </motion.div>
+      
+      {/* Force No Cache Button - only show when cached */}
+      {isFromCache && onForceNoCache && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <motion.button
+              onClick={onForceNoCache}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                isDark 
+                  ? 'bg-gray-800/50 text-gray-400 border border-gray-600/30 hover:bg-gray-700/70 hover:text-gray-300 hover:border-gray-500/50' 
+                  : 'bg-gray-100/80 text-gray-600 border border-gray-300/30 hover:bg-gray-200/90 hover:text-gray-700 hover:border-gray-400/50'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+            >
+              <RefreshCw className="h-3 w-3" />
+              <span>Force Fresh</span>
+            </motion.button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="text-center">
+              <p className="font-medium">Generate Fresh Response</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Bypass cache and generate a new response
+              </p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+};
+
+interface TypedContentProps {
+  content: string;
+  typingSpeed?: number;
+  onTypingComplete?: () => void;
+  isDark: boolean;
+  className?: string;
+  backendUrl?: string | null;
+}
+
+const TypedAnswerContainer: React.FC<TypedContentProps> = ({ 
+  content, 
+  typingSpeed = 20,
+  onTypingComplete,
+  isDark,
+  className,
+  backendUrl
+}) => {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
+  const fullTextRef = useRef(content);
+
+  useEffect(() => {
+    fullTextRef.current = content;
+    setDisplayedText("");
+    setIsComplete(false);
+    
+    if (!content) {
+      setIsComplete(true);
+      if (onTypingComplete) onTypingComplete();
+      return;
+    }
+
+    let charIndex = 0;
+    const intervalId = setInterval(() => {
+      // Ensure we don't go out of bounds if content changes mid-type (though fullTextRef helps)
+      if (charIndex < fullTextRef.current.length) {
+        setDisplayedText((prev) => prev + fullTextRef.current[charIndex]);
+        charIndex++;
+      }
+      if (charIndex === fullTextRef.current.length) {
+        clearInterval(intervalId);
+        setIsComplete(true);
+        if (onTypingComplete) onTypingComplete();
+      }
+    }, typingSpeed);
+
+    return () => clearInterval(intervalId);
+  }, [content, typingSpeed, onTypingComplete]);
+
+  const renderContent = () => {
+    if (!isComplete) {
+      return (
+        <>
+          {displayedText}
+          <motion.span
+            className="inline-block w-0.5 h-5 ml-1 bg-current"
+            animate={{ opacity: [0, 1, 0] }}
+            transition={{ duration: 0.7, repeat: Infinity }}
+          />
+        </>
+      );
+    }
+    // Use RichTextRenderer when typing is complete to enable hyperlinks
+    return <RichTextRenderer content={fullTextRef.current} backendUrl={backendUrl} />;
+  };
+  
+  return (
+    <motion.div
+      key="typed-answer-container"
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={`relative p-4 rounded-lg border min-h-[60px] ${className}`}
+      style={{
+        background: isDark
+          ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.85) 50%, rgba(30, 41, 59, 0.9) 100%)'
+          : 'linear-gradient(135deg, rgba(240, 245, 255, 0.95) 0%, rgba(245, 250, 255, 0.9) 50%, rgba(240, 245, 255, 0.95) 100%)',
+        borderColor: isDark ? 'rgba(71, 85, 105, 0.7)' : 'rgba(203, 213, 225, 0.7)',
+        boxShadow: isDark
+          ? '0 4px 15px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(255, 255, 255, 0.06) inset'
+          : '0 4px 15px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.03) inset',
+      }}
+    >
+      <div className={`prose prose-sm dark:prose-invert max-w-none ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+        {renderContent()}
+      </div>
+    </motion.div>
   );
 };
 
 // Main Response Card Component
-const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
+const ResponseCard: React.FC<ResponseCardProps> = ({
+  data,
+  backendUrl,
+  onForceNoCache,
+  showScrollHint,
+  onScroll,
+}) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isAnswerTypingComplete, setIsAnswerTypingComplete] = useState(false);
   
   // Updated initial state to show more sections expanded/visible by default
   const [expandedSections, setExpandedSections] = useState({
     answer: true,
     reasoning: false,
-    verification: false, 
+    verification: false,
     citations: false,
+    supporting_extracts: false,
     costs: false
   });
+
+  // If data changes, reset typing complete state for answer
+  useEffect(() => {
+    setIsAnswerTypingComplete(false);
+  }, [data.answer, data.models?.answer]);
 
   // Debug logging
   console.log('🎯 ResponseCard render with data:', {
@@ -609,6 +754,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
     hasCitations: data?.citations?.length > 0 ? `YES (${data.citations.length})` : 'NO',
     hasCosts: data?.costs?.length > 0 ? `YES (${data.costs.length})` : 'NO',
     cacheHit: data?.cache_hit !== undefined ? data.cache_hit : 'UNDEFINED',
+    similarityScore: data?.similarity_score || 0,
     backendUrl,
     rawData: data
   });
@@ -618,6 +764,13 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  // Handle force no cache - call the passed handler
+  const handleForceNoCache = () => {
+    if (onForceNoCache) {
+      onForceNoCache();
+    }
   };
 
   // Loading state
@@ -694,13 +847,46 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
     verification_tokens: 0
   };
 
+  const answerText = data.answer || data.models?.answer || "No answer provided.";
+  const reasoningText = data.reasoning || data.models?.reasoning;
+  const verificationText = data.verification || data.models?.verification;
+  const supportingExtracts = data.supporting_extracts;
+  const cacheHit = data.cache_hit;
+  const similarityScore = data.similarity_score;
+
+  const renderFormattedText = (text: string | undefined, type: 'answer' | 'reasoning' | 'verification' = 'answer') => {
+    if (!text) return null;
+    
+    // For answer, if typing is not complete, TypedAnswerContainer handles it.
+    // For other sections, or if answer typing is complete, parse and format.
+    if (type === 'answer' && !isAnswerTypingComplete) {
+      return (
+        <TypedAnswerContainer 
+          content={text} 
+          onTypingComplete={() => setIsAnswerTypingComplete(true)}
+          isDark={isDark}
+          className="mt-1"
+          backendUrl={backendUrl}
+        />
+      );
+    }
+    
+    return <RichTextRenderer content={text} backendUrl={backendUrl} />;
+  };
+
+  const handleScroll = () => {
+    if (!scrollContainerRef.current || !onScroll) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 1;
+    onScroll(isAtBottom);
+  };
+
   return (
     <Card className={`w-full ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} relative`}>
       <CardContent className="p-1 space-y-2">
-        {/* Enhanced scrollable container with better styling */}
         <div 
           ref={scrollContainerRef}
-          className={`max-h-[calc(85vh-8rem)] overflow-y-auto space-y-2 px-3 py-2 ${
+          className={`max-h-[calc(85vh-8rem)] overflow-y-auto space-y-2 px-3 py-2 relative ${
             isDark 
               ? 'scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500' 
               : 'scrollbar-thin scrollbar-track-gray-200 scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-500'
@@ -708,6 +894,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
           style={{
             scrollBehavior: 'smooth'
           }}
+          onScroll={handleScroll}
         >
           {/* Answer Section - Always shown and expanded */}
           <Collapsible
@@ -739,7 +926,16 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
                       <h3 className={`transition-all duration-300 font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         Answer
                       </h3>
-                      <CacheStatusIcon cacheHit={data.cache_hit} />
+                      <CacheStatusIcon
+                        cacheHit={data.cache_hit}
+                        verification={
+                          typeof data.verification === "object" && data.verification !== null
+                            ? data.verification
+                            : null
+                        }
+                        similarityScore={data.similarity_score}
+                        onForceNoCache={handleForceNoCache}
+                      />
                     </div>
                     <motion.p 
                       className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
@@ -763,13 +959,13 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
                   className="ml-3"
                   transition={{ duration: 0.2 }}
                 >
-                  <CopyButton text={data.answer} size="md" variant="secondary" />
+                  <CopyButton text={data.answer} />
                 </motion.div>
               </div>
             </motion.div>
             <CollapsibleContent>
               <ContentContainer>
-                <RichTextRenderer content={data.answer} backendUrl={backendUrl} />
+                {renderFormattedText(answerText, 'answer')}
               </ContentContainer>
             </CollapsibleContent>
           </Collapsible>
@@ -792,7 +988,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
               />
               <CollapsibleContent>
                 <ContentContainer level="secondary">
-                  <RichTextRenderer content={data.reasoning} backendUrl={backendUrl} />
+                  {renderFormattedText(reasoningText, 'reasoning')}
                 </ContentContainer>
               </CollapsibleContent>
             </Collapsible>
@@ -816,7 +1012,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
               />
               <CollapsibleContent>
                 <ContentContainer level="secondary">
-                  <RichTextRenderer content={data.verification} backendUrl={backendUrl} />
+                  {renderFormattedText(verificationText, 'verification')}
                 </ContentContainer>
               </CollapsibleContent>
             </Collapsible>
@@ -851,7 +1047,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0 mt-1">
-                            <BookOpen className={`h-4 w-4 ${
+                            <BookOpen className={`h-5 w-5 ${
                               isDark ? 'text-gray-400' : 'text-gray-500'
                             }`} />
                           </div>
@@ -882,29 +1078,29 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
               open={expandedSections.costs}
               onOpenChange={() => toggleSection('costs')}
             >
-              <SectionHeader
-                title="Cost Breakdown"
-                icon={<DollarSign className="h-5 w-5" />}
-                isExpanded={expandedSections.costs}
-                onToggle={() => toggleSection('costs')}
-                level="secondary"
-                description={`Token usage & API costs for ${costs.length} model${costs.length !== 1 ? 's' : ''}`}
-                hasContent={costs.length > 0}
-              />
-              <CollapsibleContent>
-                <ContentContainer level="secondary">
-                  <div className="space-y-4">
-                    {/* Calculate totals */}
-                    {(() => {
-                      const totalTokens = costs.reduce((sum, cost) => 
-                        sum + (cost.totalTokens || cost.total_tokens || 0), 0
-                      );
-                      const totalCost = costs.reduce((sum, cost) => 
-                        sum + (cost.totalCost || cost.total_cost || 0), 0
-                      );
-                      
-                      return (
-                        <>
+              {(() => {
+                // Calculate totals for header display
+                const totalTokens = costs.reduce((sum, cost) => 
+                  sum + (cost.totalTokens || cost.total_tokens || 0), 0
+                );
+                const totalCost = costs.reduce((sum, cost) => 
+                  sum + (cost.totalCost || cost.total_cost || 0), 0
+                );
+                
+                return (
+                  <>
+                    <SectionHeader
+                      title="Cost Breakdown"
+                      icon={<DollarSign className="h-5 w-5" />}
+                      isExpanded={expandedSections.costs}
+                      onToggle={() => toggleSection('costs')}
+                      level="secondary"
+                      description={`Total: $${totalCost.toFixed(3)} • ${totalTokens.toLocaleString()} tokens`}
+                      hasContent={costs.length > 0}
+                    />
+                    <CollapsibleContent>
+                      <ContentContainer level="secondary">
+                        <div className="space-y-4">
                           {/* Totals Summary */}
                           <motion.div
                             className={`p-4 rounded-lg border-2 ${
@@ -998,21 +1194,15 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ data, backendUrl }) => {
                               </div>
                             </motion.div>
                           ))}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </ContentContainer>
-              </CollapsibleContent>
+                        </div>
+                      </ContentContainer>
+                    </CollapsibleContent>
+                  </>
+                );
+              })()}
             </Collapsible>
           )}
         </div>
-        
-        {/* Elegant Scroll Hint */}
-        <ResponseScrollHint 
-          containerRef={scrollContainerRef}
-          isVisible={!!data && !!data.answer}
-        />
       </CardContent>
     </Card>
   );

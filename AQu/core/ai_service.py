@@ -9,6 +9,7 @@ from config.settings import Settings
 from new_search import navigate_to_paragraphs, generate_answer, split_into_50_chunks
 import json
 import datetime
+from core.cache_manager import RedisCacheManager
 
 class AIService:
     def __init__(self):
@@ -29,6 +30,9 @@ class AIService:
         self.mini_model = self.settings.get("AZURE_OPENAI_DEPLOYMENT_MINI")
         self.main_model = self.settings.get("AZURE_OPENAI_DEPLOYMENT_MAIN")
         self.nano_model = self.settings.get("AZURE_OPENAI_DEPLOYMENT_NANO")
+        
+        # Initialize cache manager
+        self.cache_manager = RedisCacheManager()
         
     def _initialize_client(self, model_type: str) -> AzureOpenAI:
         """Initialize the Azure OpenAI client for a specific model type."""
@@ -77,9 +81,33 @@ class AIService:
             "model": pricing["name"]
         }
 
-    def process_query(self, query: str, pdf_content: str) -> Dict:
+    def process_query(self, query: str, pdf_content: str, category: str = "reliance", force_no_cache: bool = False) -> Dict:
         """Process a query and return the answer with reasoning."""
         try:
+            # Check cache first (unless force_no_cache is True)
+            cached_response = self.cache_manager.get_cached_response(query, category, force_no_cache)
+            if cached_response and not force_no_cache:
+                self.logger.info(f"Returning cached response (match type: {cached_response.get('match_type', 'unknown')})")
+                
+                # Add nano verification costs if they exist
+                if 'nano_verification' in cached_response:
+                    nano_cost = cached_response['nano_verification'].get('nano_cost', {})
+                    if nano_cost.get('cost', 0) > 0:
+                        cache_cost = {
+                            "model": nano_cost.get('model', 'nano'),
+                            "inputTokens": nano_cost.get('input_tokens', 0),
+                            "outputTokens": nano_cost.get('output_tokens', 0),
+                            "totalTokens": nano_cost.get('input_tokens', 0) + nano_cost.get('output_tokens', 0),
+                            "inputCost": 0,  # Will be calculated
+                            "outputCost": 0,  # Will be calculated
+                            "totalCost": nano_cost.get('cost', 0),
+                            "operation": "cache_verification"
+                        }
+                        # Add cache verification cost to existing costs
+                        cached_response['costs'] = cached_response.get('costs', []) + [cache_cost]
+                
+                return cached_response
+            
             # Get relevant paragraphs
             relevant_paragraphs = self._get_relevant_paragraphs(query, pdf_content)
             
@@ -207,7 +235,8 @@ Verification:"""
                     "totalTokens": reasoning_response.usage.total_tokens,
                     "inputCost": reasoning_costs["inputCost"],
                     "outputCost": reasoning_costs["outputCost"],
-                    "totalCost": reasoning_costs["totalCost"]
+                    "totalCost": reasoning_costs["totalCost"],
+                    "operation": "reasoning"
                 },
                 {
                     "model": answer_costs['model'],
@@ -216,7 +245,8 @@ Verification:"""
                     "totalTokens": answer_response.usage.total_tokens,
                     "inputCost": answer_costs["inputCost"],
                     "outputCost": answer_costs["outputCost"],
-                    "totalCost": answer_costs["totalCost"]
+                    "totalCost": answer_costs["totalCost"],
+                    "operation": "answer_generation"
                 },
                 {
                     "model": verification_costs['model'],
@@ -225,7 +255,8 @@ Verification:"""
                     "totalTokens": verification_response.usage.total_tokens,
                     "inputCost": verification_costs["inputCost"],
                     "outputCost": verification_costs["outputCost"],
-                    "totalCost": verification_costs["totalCost"]
+                    "totalCost": verification_costs["totalCost"],
+                    "operation": "verification"
                 }
             ]
             
@@ -241,7 +272,7 @@ Verification:"""
                 "verification_tokens": verification_response.usage.total_tokens
             }
             
-            return {
+            response = {
                 "answer": answer,
                 "reasoning": reasoning,
                 "verification": verification,
@@ -255,8 +286,16 @@ Verification:"""
                 },
                 "usage": total_usage,
                 "success": True,
-                "timestamp": datetime.datetime.now().timestamp()
+                "timestamp": datetime.datetime.now().timestamp(),
+                "cache_hit": False,
+                "forced_no_cache": force_no_cache
             }
+            
+            # Cache the response (unless force_no_cache was used)
+            if not force_no_cache:
+                self.cache_manager.cache_response(query, category, response)
+            
+            return response
             
         except Exception as e:
             self.logger.error(f"Error processing query: {str(e)}")
@@ -282,7 +321,8 @@ Verification:"""
                 "verification_tokens": 0
             },
             "success": True,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "cache_hit": False  # Add cache hit status
         }
     
     def _create_error_response(self, error_message: str) -> Dict:
@@ -306,7 +346,8 @@ Verification:"""
             },
             "success": False,
             "error": error_message,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "cache_hit": False  # Add cache hit status
         }
             
     async def analyze_text(self, 
