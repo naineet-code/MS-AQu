@@ -84,6 +84,13 @@ export default function FAQPage() {
   const [showTechnicalInfo, setShowTechnicalInfo] = useState(false);
   const [showBusinessGuide, setShowBusinessGuide] = useState(false);
 
+  // Effect to close chat history when PDF viewer or guides are opened
+  useEffect(() => {
+    if (showPdfDialog || showHelpScreen || showTechnicalInfo || showBusinessGuide) {
+      setShowChatHistory(false);
+    }
+  }, [showPdfDialog, showHelpScreen, showTechnicalInfo, showBusinessGuide]);
+
   // Global click handler to reset chat position when clicking outside
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
